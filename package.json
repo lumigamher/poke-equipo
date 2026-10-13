@@ -15,6 +15,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "sprites": "node scripts/bajar-sprites.mjs",
+    "icono": "node --no-warnings scripts/icono.mjs",
     "poderes": "node scripts/bajar-poderes.mjs",
     "dist:mac": "electron-vite build && POKE_ARCH=arm64 electron-builder --mac --arm64 --config electron-builder.config.mjs",
     "dist:mac:intel": "node scripts/preparar-intel.mjs && electron-vite build && POKE_ARCH=x64 electron-builder --mac --x64 --config electron-builder.config.mjs"

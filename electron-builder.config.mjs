@@ -91,7 +91,8 @@ export default {
   mac: {
     category: "public.app-category.developer-tools",
     target: ["dmg", "zip"],
-    // Sin ícono propio: se queda el de Electron (no hay build/icon.icns). Para ponerlo, dejar el archivo en build/.
+    // Ícono propio (la pokébola pixel-art de la app): se regenera con `bun run icono`.
+    icon: "build/icon.icns",
     identity: hayCertificado ? undefined : "-",
     hardenedRuntime: hayCertificado,
     gatekeeperAssess: false,

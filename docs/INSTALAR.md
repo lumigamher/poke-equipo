@@ -81,8 +81,6 @@ bun run dist:mac:intel    # Intel: baja los binarios x64 que faltan y arma dist/
 - La app se arma en una carpeta temporal (`$TMPDIR/poke-equipo-build`, o la de `POKE_STAGING`) y los instaladores se
   copian a `dist/`. Hace falta porque, si el repo está en una carpeta sincronizada con iCloud (Documentos, Escritorio),
   macOS le pega atributos a cada carpeta de la app y `codesign` falla con "resource fork, Finder information…".
-- No hay ícono propio todavía: se queda el de Electron. Para ponerlo, deja `build/icon.icns` y
-  añade `icon: "build/icon.icns"` en `electron-builder.config.mjs`.
 - Sin certificado, el instalador sale con **firma ad-hoc** (`identity: "-"`): Apple Silicon exige al menos eso para
   ejecutar el binario, pero Gatekeeper la trata como "no identificada" (apartado 2).
 

@@ -1,3 +1,4 @@
+import { POKEBOLA_COLORES, POKEBOLA_FILAS } from "@compartido/pokebola-pixeles";
 import type { Actividad, DatosAnim } from "@compartido/tipos";
 import type { Direccion } from "./animaciones";
 import { ESPECIALES, GOLPES } from "./poderes";
@@ -225,20 +226,7 @@ export interface Rejilla {
 }
 
 export const OBJETOS: Record<NombreObjeto, Rejilla> = {
-  pokebola: {
-    filas: [
-      "...nnnn...",
-      ".nrrrrrrn.",
-      "nrrbrrrrrn",
-      "nrrrrrrrrn",
-      "nnnnnnnnnn",
-      "nbbbnbnbbn",
-      "nbbbbnbbbn",
-      ".nbbbbbbn.",
-      "...nnnn...",
-    ],
-    colores: { n: "#1c1c1c", r: "#e03a3a", b: "#f4f4f4" },
-  },
+  pokebola: { filas: POKEBOLA_FILAS, colores: POKEBOLA_COLORES },
   libro: {
     filas: [
       ".mmmmm.mmmmm.",
