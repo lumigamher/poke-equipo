@@ -1,5 +1,6 @@
-import { RAPIDO_MAX_MS } from "./tiempos-voz";
+import { RAPIDO_MAX_MS, TROZO_MAX_S } from "./tiempos-voz";
 import type { Frase, Segmentador, Transcriptor, TranscriptorPreciso, Trozo } from "./transcriptor";
+import { partirTrozo } from "./trozos";
 
 const FRECUENCIA = 16000;
 /** Cuánto audio se recuerda para ubicar en el tiempo el inicio de una frase. */
@@ -75,10 +76,10 @@ export class Oido {
 
   private procesar(trozos: Trozo[]): void {
     const ahora = this.opciones.ahora ?? (() => performance.now());
-    for (const trozo of trozos) {
+    for (const trozo of this.partirLargos(trozos)) {
       if (this.silenciado) return;
       // La hora se fija ya: cuando el texto llegue (otro proceso), la memoria del audio pudo haber avanzado.
-      const inicioMs = this.horaDe(trozo.inicio);
+      const inicioMs = trozo.sinHora ? null : this.horaDe(trozo.inicio);
       const t0 = ahora();
       const r = this.rapido.transcribir(trozo.muestras);
       if (typeof r === "string") {
@@ -107,6 +108,19 @@ export class Oido {
           if (this.enCurso === 0) this.opciones.alTranscribir?.(false);
         });
     }
+  }
+
+  /** Parte los trozos de más de TROZO_MAX_S antes de transcribirlos (ver TROZO_MAX_S), y lo deja en el registro. */
+  private partirLargos(trozos: Trozo[]): Trozo[] {
+    return trozos.flatMap((trozo) => {
+      const pedazos = partirTrozo(trozo, TROZO_MAX_S * FRECUENCIA);
+      if (pedazos.length > 1) {
+        this.opciones.registrar?.(
+          `Oído: trozo de ${segundos(trozo.muestras.length)} s partido en ${pedazos.length} (tope ${TROZO_MAX_S} s)`,
+        );
+      }
+      return pedazos;
+    });
   }
 
   /** Rechaza si el paso rápido no responde en RAPIDO_MAX_MS: un proceso colgado no retiene el aviso para siempre. */

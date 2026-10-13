@@ -487,16 +487,26 @@ async function arrancar(): Promise<void> {
   };
 
   // El modelo preciso es lento (más que el audio mismo): corre en otro proceso para no congelar la app.
+  // Si uno de los dos procesos se cae, se relanza solo; si sigue cayéndose, queda apagado y se avisa una vez, sin
+  // ventanas: prender otra vez el micrófono lo reintenta (ver ponerEscucha).
+  const alOidoCaido = () =>
+    avisarDesdeBandeja(
+      "Se me cayó el oído y no te estoy oyendo. Apaga y prende el micrófono para reintentar.",
+    );
   const preciso = crearClientePreciso({
     lanzar: () => lanzarProcesoPreciso(modelos.preciso, RUTAS.modelos),
     ahora: () => Date.now(),
     aviso: (mensaje, e) => console.warn(mensaje, e),
+    nombre: "preciso",
+    alCaido: alOidoCaido,
   });
   // El rápido también corre aparte: con la máquina cargada tarda segundos y congelaba los menús y el clic derecho.
   const rapido = crearClientePreciso({
     lanzar: () => lanzarProcesoPreciso(modelos.rapido, RUTAS.modelos, "poke-rapido"),
     ahora: () => Date.now(),
     aviso: (mensaje, e) => console.warn(mensaje, e),
+    nombre: "rápido",
+    alCaido: alOidoCaido,
   });
   const { oido, alVista, alSonarVoz, dictar, terminarDictado, dictandoA } = crearCableadoVoz({
     segmentador: crearSegmentador(RUTAS.modelos),
@@ -601,6 +611,11 @@ async function arrancar(): Promise<void> {
   /** Única puerta para pausar o reanudar la escucha: barra de menú, clic derecho, atajo global y voz. */
   function ponerEscucha(encendido: boolean): void {
     micEncendido = encendido;
+    // Prender el micrófono también levanta un oído que quedó caído. Solo relanza el proceso: no reenvía audio.
+    if (encendido) {
+      rapido.reintentar();
+      preciso.reintentar();
+    }
     oido.silenciar("usuario", !encendido);
     if (!win.isDestroyed()) win.webContents.send(CANALES.microfonoOrden, encendido);
     equipoActivo?.pausarOido(!encendido);

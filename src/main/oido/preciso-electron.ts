@@ -18,7 +18,8 @@ export function lanzarProcesoPreciso(
       proceso.on("message", fn);
     },
     alSalir: (fn) => {
-      proceso.on("exit", () => fn());
+      // Un cierre por falta de memoria dentro de onnxruntime llega aquí (código 5 = SIGTRAP): main sigue vivo.
+      proceso.on("exit", (codigo) => fn(typeof codigo === "number" ? codigo : null));
     },
     matar: () => {
       proceso.kill();

@@ -17,3 +17,12 @@ export const VOZ_MINIMA_S = 0.25;
  * con 5 s se podían perder trozos legítimos.
  */
 export const RAPIDO_MAX_MS = 8000;
+
+/**
+ * Tope (s) de audio que se le pasa de una vez a un transcriptor. El `maxSpeechDuration` del VAD es blando: con
+ * conversación o tele de fondo entrega trozos de 35–40 s (medido con voz sintética). Cada trozo más largo que los
+ * anteriores hace crecer la arena de onnxruntime, que no devuelve memoria y pide bloques cada vez más grandes; dentro
+ * de un `utilityProcess` de Electron una reserva enorme que falla mata el proceso (SIGTRAP) en vez de devolver error.
+ * Los trozos más largos se parten antes de transcribirlos. Whisper tampoco admite más de 30 s.
+ */
+export const TROZO_MAX_S = 20;

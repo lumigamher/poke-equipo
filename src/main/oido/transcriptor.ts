@@ -2,6 +2,8 @@
 export interface Trozo {
   muestras: Float32Array;
   inicio: number;
+  /** El pedazo de un trozo largo que se partió y no es el primero: su hora no vale para responder permisos. */
+  sinHora?: boolean;
 }
 
 export interface Segmentador {

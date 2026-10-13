@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Oido } from "./oido";
-import { RAPIDO_MAX_MS } from "./tiempos-voz";
+import { RAPIDO_MAX_MS, TROZO_MAX_S } from "./tiempos-voz";
 import type { Frase, Segmentador, Transcriptor, TranscriptorPreciso, Trozo } from "./transcriptor";
 
 function falsos() {
@@ -177,6 +177,23 @@ describe("Oido", () => {
       f.cola.push([tr(500, 0)]);
       oido.recibir(trozo(1600), 20_200);
       expect(frases[0].inicioMs).toBe(20_000);
+    });
+
+    it("un trozo de más de TROZO_MAX_S se parte antes de transcribirlo; solo el primer pedazo lleva hora", () => {
+      const f = falsos();
+      const frases: Frase[] = [];
+      const lineas: string[] = [];
+      const oido = new Oido(f.seg, f.rapido, f.preciso, (x) => frases.push(x), {
+        registrar: (l) => lineas.push(l),
+      });
+      oido.recibir(trozo(1600), 10_100); // empezó en 10_000
+      const largo = Math.round(1.5 * TROZO_MAX_S * 16000);
+      f.cola.push([tr(largo, 0)]);
+      oido.recibir(trozo(1600), 10_200);
+      expect(f.rapidos).toEqual([largo / 2, largo / 2]);
+      expect(Math.max(...f.rapidos)).toBeLessThanOrEqual(TROZO_MAX_S * 16000);
+      expect(frases.map((x) => x.inicioMs)).toEqual([10_000, null]);
+      expect(lineas[0]).toMatch(/partido en 2/);
     });
 
     it("un índice de hace más de la memoria no se puede ubicar", () => {

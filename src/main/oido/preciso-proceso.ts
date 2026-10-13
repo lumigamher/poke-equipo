@@ -4,6 +4,7 @@
  * `{ id, error }`. Así el paso lento (Whisper) no bloquea el hilo principal de la app.
  */
 import { crearTranscriptor } from "./sherpa";
+import { TROZO_MAX_S } from "./tiempos-voz";
 import type { ModeloTranscriptor } from "./transcriptor";
 
 const argumento = (nombre: string): string | undefined =>
@@ -24,6 +25,8 @@ puerto.on("message", (evento) => {
   if (typeof id !== "number") return;
   try {
     if (!(muestras instanceof Float32Array)) throw new Error("muestras inválidas");
+    // Main ya parte los trozos largos; si alguno se cuela, se rechaza antes de que la arena de onnxruntime lo pague.
+    if (muestras.length > TROZO_MAX_S * 16000) throw new Error("trozo demasiado largo");
     // Copia propia: no se depende de que el buffer recibido siga siendo válido.
     const copia = Float32Array.from(muestras);
     const t0 = performance.now();
