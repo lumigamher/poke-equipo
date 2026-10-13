@@ -496,7 +496,7 @@ async function arrancar(): Promise<void> {
   const preciso = crearClientePreciso({
     lanzar: () => lanzarProcesoPreciso(modelos.preciso, RUTAS.modelos),
     ahora: () => Date.now(),
-    aviso: (mensaje, e) => console.warn(mensaje, e),
+    aviso: (mensaje, e) => (e === undefined ? console.warn(mensaje) : console.warn(mensaje, e)),
     nombre: "preciso",
     alCaido: alOidoCaido,
   });
@@ -504,7 +504,7 @@ async function arrancar(): Promise<void> {
   const rapido = crearClientePreciso({
     lanzar: () => lanzarProcesoPreciso(modelos.rapido, RUTAS.modelos, "poke-rapido"),
     ahora: () => Date.now(),
-    aviso: (mensaje, e) => console.warn(mensaje, e),
+    aviso: (mensaje, e) => (e === undefined ? console.warn(mensaje) : console.warn(mensaje, e)),
     nombre: "rápido",
     alCaido: alOidoCaido,
   });
@@ -515,7 +515,7 @@ async function arrancar(): Promise<void> {
     controlador: () => equipoActivo,
     ahora: () => Date.now(),
     programar: reloj.programar,
-    aviso: (mensaje, e) => console.warn(mensaje, e),
+    aviso: (mensaje, e) => (e === undefined ? console.warn(mensaje) : console.warn(mensaje, e)),
     registrar: (linea) => console.info(linea),
     // Se llama más tarde, con cada frase: `especiesDisponibles` ya existe para entonces.
     especies: () => especiesDisponibles(),
