@@ -1,0 +1,24 @@
+{
+  "conjunto": [
+    "vits-piper-es_MX-claude-high-int8",
+    "vits-piper-es_ES-davefx-medium-int8",
+    "vits-piper-es_ES-sharvard-medium-int8",
+    "vits-piper-es_MX-ald-medium-int8",
+    "vits-piper-es_AR-daniela-high-int8"
+  ],
+  "especies": {
+    "1": { "voz": "vits-piper-es_AR-daniela-high-int8", "velocidad": 1.0 },
+    "4": { "voz": "vits-piper-es_ES-davefx-medium-int8", "velocidad": 1.05 },
+    "7": { "voz": "vits-piper-es_ES-sharvard-medium-int8", "velocidad": 1.0 },
+    "25": { "voz": "vits-piper-es_MX-claude-high-int8", "velocidad": 1.1 },
+    "39": { "voz": "vits-piper-es_MX-ald-medium-int8", "velocidad": 1.0 },
+    "52": { "voz": "vits-piper-es_ES-davefx-medium-int8", "velocidad": 0.95 },
+    "54": { "voz": "vits-piper-es_AR-daniela-high-int8", "velocidad": 1.0 },
+    "94": { "voz": "vits-piper-es_ES-sharvard-medium-int8", "velocidad": 0.95 },
+    "133": { "voz": "vits-piper-es_MX-ald-medium-int8", "velocidad": 1.05 },
+    "143": { "voz": "vits-piper-es_ES-davefx-medium-int8", "velocidad": 0.9 },
+    "150": { "voz": "vits-piper-es_MX-claude-high-int8", "velocidad": 0.95 },
+    "151": { "voz": "vits-piper-es_AR-daniela-high-int8", "velocidad": 1.05 },
+    "448": { "voz": "vits-piper-es_ES-sharvard-medium-int8", "velocidad": 1.0 }
+  }
+}

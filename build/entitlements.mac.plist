@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Solo se aplican con firma real (Developer ID): la firma ad-hoc de electron-builder no activa el runtime endurecido. -->
+    <!-- Probado con runtime endurecido + firma ad-hoc: la app, sherpa-onnx y el ejecutable de Claude funcionan con estos tres
+         y NO hacen falta com.apple.security.cs.allow-unsigned-executable-memory. Sin disable-library-validation, Electron
+         Framework ni carga (dyld: Library not loaded). -->
+    <!-- Electron/V8 compila código en caliente. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <!-- Las librerías de sherpa-onnx y del ejecutable de Claude no llevan la firma de la app. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- Micrófono: la app oye las órdenes habladas. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+  </dict>
+</plist>

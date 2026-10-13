@@ -1,0 +1,9 @@
+{
+  "rapido": "parakeet",
+  "preciso": "whisper-turbo",
+  "referencia": {
+    "fuente": "medición propia, 2026-10-10, unos 250 s de voz, 4 hilos, int8",
+    "parakeet": { "cargaSegundos": 1.7, "computoSegundos": 15.9, "vecesTiempoReal": 15.7 },
+    "whisper-turbo": { "cargaSegundos": 2.6, "computoSegundos": 147.8, "vecesTiempoReal": 1.7 }
+  }
+}

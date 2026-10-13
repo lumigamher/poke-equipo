@@ -1,0 +1,2262 @@
+:root {
+  --tinta: #26221c;
+  --papel: #f7f2e4;
+  --borde: #26221c;
+  --rojo: #d8402f;
+  --verde: #3fa856;
+  --ambar: #d9a514;
+  /* Curvas de la casa: salida fuerte para lo que aparece, y un aterrizaje con un rebote pequeño. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-aterrizar: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html,
+body,
+#raiz {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+body {
+  font:
+    13px / 1.45 ui-rounded,
+    -apple-system,
+    "SF Pro Rounded",
+    sans-serif;
+  color: var(--tinta);
+  user-select: none;
+}
+
+/* Ancho cero y hijos centrados: el centro cae siempre en un píxel entero (la x llega redondeada) y el pixel art
+   no tiembla al caminar. Se mueve con transform, sin recalcular el diseño en cada cuadro. */
+.pokemon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.cuerpo {
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+}
+/* Al soltarlo cae con un rebote pequeño; al levantarlo sube rápido. Solo transform: no recalcula el diseño. */
+.cuerpo-alto {
+  transition: transform 300ms var(--ease-aterrizar);
+}
+.cuerpo-alzado .cuerpo-alto {
+  transform: translateY(-12px);
+  transition: transform 140ms var(--ease-out);
+}
+/* Sombra en el suelo: se encoge y aclara cuando el Pokémon está en el aire. */
+.sombra {
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 54px;
+  height: 8px;
+  margin-left: -27px;
+  border-radius: 50%;
+  background: rgba(38, 34, 28, 0.22);
+  pointer-events: none;
+  transition:
+    transform 300ms var(--ease-aterrizar),
+    opacity 300ms var(--ease-out);
+}
+.cuerpo-alzado .sombra {
+  transform: scale(0.6);
+  opacity: 0.5;
+  transition:
+    transform 140ms var(--ease-out),
+    opacity 140ms var(--ease-out);
+}
+.cuerpo:active {
+  cursor: grabbing;
+}
+.cuerpo-zona {
+  position: relative;
+}
+/* Contiene el margen del lienzo: sin esto el margen se colapsa con la caja y la mueve entera,
+   y el Pokémon flota o se corta según la pose. */
+.sprite-caja {
+  display: flow-root;
+}
+/* Rótulo con lo que hace Claude Code; no recibe el mouse. */
+.verbo {
+  display: block;
+  padding: 2px 8px;
+  background: rgba(38, 34, 28, 0.88);
+  color: #f7f2e4;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  min-height: 1.4em;
+  pointer-events: none;
+}
+.verbo {
+  position: relative;
+}
+/* El cuadro de la tarea: lo que piensa el Pokémon y, debajo, sus ayudantes. Del mismo material que el verbo. */
+.progreso {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 260px;
+  padding: 5px 9px 6px;
+  background: rgba(38, 34, 28, 0.9);
+  color: #f7f2e4;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: left;
+}
+.progreso-en-burbuja {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: none;
+  margin-top: 6px;
+  padding: 6px 0 0;
+  background: none;
+  color: inherit;
+  border-top: 1px solid rgba(58, 52, 43, 0.18);
+  border-radius: 0;
+  font-size: 11.5px;
+}
+.progreso-piensa {
+  margin: 0;
+  font-style: italic;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.progreso-titulo {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.progreso-piensa + .progreso-titulo,
+.progreso-pendientes + .progreso-titulo {
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(247, 242, 228, 0.18);
+}
+.progreso-en-burbuja .progreso-piensa + .progreso-titulo,
+.progreso-en-burbuja .progreso-pendientes + .progreso-titulo {
+  border-top-color: rgba(58, 52, 43, 0.18);
+}
+.progreso-ayudantes {
+  margin: 3px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.progreso-ayudantes li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-top: 2px;
+}
+.progreso-numero,
+.ayudante-numero {
+  flex: none;
+  display: inline-block;
+  min-width: 13px;
+  padding: 0 3px;
+  background: #f2c94c;
+  color: #26221c;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  font-style: normal;
+  line-height: 13px;
+  text-align: center;
+}
+.ayudante-numero {
+  margin-right: 4px;
+}
+.progreso-linea {
+  min-width: 0;
+}
+.progreso-encargo {
+  display: block;
+  font-weight: 700;
+}
+.progreso-hace {
+  display: block;
+  font-style: italic;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+/* Dentro de la burbuja hay sitio para leerlo todo: sin recortes a 2 líneas ni a una sola línea. */
+.progreso-en-burbuja .progreso-piensa {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow-wrap: anywhere;
+}
+.progreso-en-burbuja .progreso-hace {
+  white-space: normal;
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+.verbo-puntos span {
+  animation: verbo-punto 1200ms infinite both;
+}
+.verbo-puntos span:nth-child(2) {
+  animation-delay: 200ms;
+}
+.verbo-puntos span:nth-child(3) {
+  animation-delay: 400ms;
+}
+@keyframes verbo-punto {
+  0%,
+  60%,
+  100% {
+    opacity: 0.2;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+/* El objeto se apoya en el mismo suelo que el Pokémon, a su lado, sin tocar el mouse. */
+.objeto-lugar {
+  --objeto-distancia: 42px;
+  position: absolute;
+  bottom: 0;
+  pointer-events: none;
+  animation: objeto-entrar 200ms var(--ease-out);
+  transform-origin: 50% 100%;
+}
+/* Con vaivén, el Pokémon se mueve 24 px a cada lado: el objeto se aparta lo justo. */
+.objeto-lugar-vaiven {
+  --objeto-distancia: 66px;
+}
+.objeto-derecha {
+  left: 50%;
+  margin-left: var(--objeto-distancia);
+}
+.objeto-izquierda {
+  right: 50%;
+  margin-right: var(--objeto-distancia);
+}
+/* El cursor de lo que se está escribiendo: parpadea a paso de terminal. */
+.objeto-cursor {
+  fill: #f4f4f4;
+  animation: cursor-parpadeo 600ms steps(1) infinite;
+}
+@keyframes cursor-parpadeo {
+  50% {
+    opacity: 0;
+  }
+}
+.objeto {
+  display: block;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+@keyframes objeto-entrar {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sprite {
+  image-rendering: pixelated;
+  display: block;
+}
+
+/* Lista de comandos dentro de la burbuja, encima del campo. */
+.comandos {
+  margin: 0 0 6px;
+  padding: 4px;
+  border: 2px solid var(--borde);
+  border-radius: 4px;
+  background: #fffdf6;
+}
+.comando {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.comando-elegido {
+  background: var(--tinta);
+  color: var(--papel);
+}
+.comando-nombre {
+  font:
+    600 12px / 1.3 ui-monospace,
+    "SF Mono",
+    Menlo,
+    monospace;
+}
+.comando-argumento {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.comando-descripcion {
+  font-size: 11px;
+  line-height: 1.3;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Caja de diálogo al estilo de los juegos: papel claro, borde grueso, sombra dura. */
+.burbuja {
+  box-sizing: border-box;
+  width: 320px;
+  max-height: min(300px, var(--alto-disp, 300px));
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: var(--papel);
+  border: 2px solid var(--borde);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 rgba(38, 34, 28, 0.35);
+  animation: burbuja-entrar 180ms var(--ease-out);
+  transform-origin: 50% 100%;
+}
+.burbuja-lugar {
+  position: relative;
+  width: 320px;
+}
+/* Cola que apunta al Pokémon: --cola es su x dentro de la burbuja, ya limitada a las esquinas. */
+.burbuja-cola {
+  position: absolute;
+  left: var(--cola);
+  bottom: -7px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  box-sizing: border-box;
+  background: var(--papel);
+  border: 2px solid var(--borde);
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(45deg);
+}
+.burbuja-texto {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.burbuja-escucha .burbuja-texto {
+  font-style: italic;
+}
+.burbuja-error {
+  border-color: var(--rojo);
+}
+
+.permiso-detalle {
+  display: block;
+  margin: 8px 0;
+  padding: 6px 8px;
+  max-height: 120px;
+  overflow: auto;
+  font:
+    12px / 1.4 ui-monospace,
+    "SF Mono",
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #ebe4d0;
+  border-radius: 4px;
+  user-select: text;
+}
+.botones {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.permiso .botones {
+  margin-top: 0;
+}
+.boton {
+  min-width: 64px;
+  padding: 5px 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--tinta);
+  background: var(--papel);
+  border: 2px solid var(--borde);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.boton:hover {
+  background: #ebe4d0;
+}
+.boton:focus-visible,
+.escribir-campo:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 2px;
+}
+.boton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #ddd6c2;
+}
+.boton-si:disabled {
+  background: #6b645a;
+}
+.boton-si {
+  background: var(--tinta);
+  color: var(--papel);
+}
+.boton-si:hover {
+  background: #403a30;
+}
+
+/* Burbuja cerrada: una pastilla con el nombre y el estado. El punto dice qué tiene: rojo si pide permiso, verde si
+   habla. Pulsarla pide a main que sea la abierta. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 3px 10px 3px 8px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--tinta);
+  background: var(--papel);
+  border: 2px solid var(--borde);
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 rgba(38, 34, 28, 0.35);
+  cursor: pointer;
+  white-space: nowrap;
+  animation: chip-entrar 160ms var(--ease-out);
+  transform-origin: 50% 100%;
+}
+.chip:hover {
+  background: #ebe4d0;
+}
+.chip:active {
+  transform: translateY(1px);
+  box-shadow: 1px 1px 0 rgba(38, 34, 28, 0.35);
+}
+.chip:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 2px;
+}
+.chip-punto {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(38, 34, 28, 0.35);
+}
+.chip-permiso .chip-punto {
+  background: var(--rojo);
+  animation: chip-latir 1.2s ease-in-out infinite;
+}
+.chip-habla .chip-punto {
+  background: var(--verde);
+}
+.chip-permiso {
+  border-color: var(--rojo);
+}
+.chip-nombre {
+  font-weight: 700;
+}
+.chip-estado {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+@keyframes chip-entrar {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+@keyframes chip-latir {
+  50% {
+    transform: scale(1.35);
+  }
+}
+
+.escribir {
+  margin-top: 8px;
+}
+.escribir-campo {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  font: inherit;
+  color: var(--tinta);
+  background: #fffdf6;
+  border: 1px solid #b9b19c;
+  border-radius: 4px;
+}
+
+.ps {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  background: var(--papel);
+  border: 2px solid var(--borde);
+  border-radius: 4px;
+}
+.ps-rotulo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.ps-riel {
+  width: 72px;
+  height: 6px;
+  background: #cfc7b2;
+  border-radius: 3px;
+  overflow: hidden;
+}
+/* Debajo de los PS, la barrita del límite de la sesión del plan: se llena con el uso y se pone roja al final. */
+.ps-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ps-limite {
+  width: 72px;
+  height: 3px;
+  background: #cfc7b2;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ps-limite-nivel {
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 50%;
+  transition:
+    transform 500ms var(--ease-out),
+    background-color 300ms var(--ease-out);
+}
+.ps-limite-bien {
+  background: #6b645a;
+}
+.ps-limite-medio {
+  background: var(--ambar);
+}
+.ps-limite-bajo {
+  background: var(--rojo);
+}
+.ps-nivel {
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 50%;
+  transition: transform 500ms var(--ease-out);
+}
+.ps-bien {
+  background: var(--verde);
+}
+.ps-medio {
+  background: var(--ambar);
+}
+.ps-bajo {
+  background: var(--rojo);
+}
+.alterado {
+  flex: none;
+  white-space: nowrap;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  border-radius: 3px;
+}
+.alterado-sordo {
+  background: #6b6b6b;
+}
+.alterado-confundido {
+  background: #8a5fc7;
+}
+.alterado-paralizado {
+  background: #8f6c0a;
+}
+.alterado-envenenado {
+  background: #9a3fa8;
+}
+.alterado-dormido {
+  background: #5f6f7f;
+}
+
+/* Pokébola en pixel art. Salida (abrir, 0–2,1 s): cae y rebota (0–0,45 s), se sacude tres veces (0,5–1,1 s),
+   se abre a 1,15 s con un estallido de luz (halo, rayos que giran, haz y chispas) y el Pokémon sale como una
+   silueta blanca que toma color. Regreso (cerrar, 0–1,6 s): llega abierta, un haz rojo lo absorbe y se cierra. */
+.pokebola {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 30px;
+  height: 27px;
+  margin-left: -15px;
+  pointer-events: none;
+}
+.pokebola-bola {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+}
+.pokebola-tapa,
+.pokebola-base {
+  position: absolute;
+  left: 0;
+  display: block;
+  image-rendering: pixelated;
+}
+.pokebola-tapa {
+  top: 0;
+  /* Bisagra atrás, en el borde izquierdo de la franja. */
+  transform-origin: 10% 100%;
+}
+.pokebola-base {
+  bottom: 0;
+}
+/* Todo el brillo nace del centro de la bola. */
+.pokebola-luz {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+.pokebola-luz > span {
+  position: absolute;
+  opacity: 0;
+}
+.pokebola-halo {
+  left: -60px;
+  top: -60px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff 0%,
+    #fff7c2 25%,
+    rgba(255, 236, 140, 0.55) 45%,
+    rgba(255, 236, 140, 0) 70%
+  );
+}
+.pokebola-rayos {
+  left: -90px;
+  top: -90px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    rgba(255, 210, 63, 0.95) 0deg 6deg,
+    rgba(255, 255, 255, 0) 6deg 18deg,
+    rgba(255, 255, 255, 0.95) 18deg 22deg,
+    rgba(255, 255, 255, 0) 22deg 36deg
+  );
+  mask: radial-gradient(circle, #000 20%, transparent 70%);
+}
+.pokebola-haz {
+  left: -26px;
+  bottom: 0;
+  width: 52px;
+  height: 150px;
+  background: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 250, 210, 0.5) 55%,
+    rgba(255, 255, 255, 0)
+  );
+  transform-origin: 50% 100%;
+  border-radius: 26px 26px 0 0;
+}
+.chispa {
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px #ffd23f,
+    0 0 6px #ffd23f;
+}
+/* Onda expansiva: un anillo dorado que se abre desde la bola. */
+.pokebola-onda {
+  left: -40px;
+  top: -40px;
+  width: 80px;
+  height: 80px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 210, 63, 0.95);
+  box-shadow: 0 0 10px rgba(255, 210, 63, 0.8);
+}
+.chispa-dorada {
+  background: #ffe066;
+  box-shadow: 0 0 4px #ffd23f;
+}
+
+.pokebola-abrir .pokebola-bola {
+  animation:
+    bola-caer 450ms cubic-bezier(0.5, 0, 0.75, 0) both,
+    bola-sacudir 600ms 500ms ease-in-out,
+    bola-irse 300ms 1500ms var(--ease-out) forwards;
+}
+.pokebola-abrir .pokebola-tapa {
+  animation: tapa-abrir 220ms 1150ms var(--ease-out) forwards;
+}
+.pokebola-abrir .pokebola-halo {
+  animation: halo-estallar 650ms 1150ms var(--ease-out);
+}
+.pokebola-abrir .pokebola-rayos {
+  animation: rayos-girar 800ms 1150ms var(--ease-out);
+}
+.pokebola-abrir .pokebola-haz {
+  animation: haz-subir 650ms 1170ms var(--ease-out);
+}
+.pokebola-abrir .pokebola-onda {
+  animation: onda-abrir 550ms 1150ms var(--ease-out);
+}
+.pokebola-abrir .chispa {
+  animation: chispa-volar 650ms 1180ms var(--ease-out);
+}
+.cuerpo-aparece .sprite {
+  animation: poke-aparecer 700ms 1200ms var(--ease-out) both;
+  transform-origin: 50% 100%;
+}
+
+.pokebola-cerrar .pokebola-bola {
+  animation:
+    bola-llegar 250ms var(--ease-out) both,
+    bola-sacudir 400ms 1000ms ease-in-out,
+    bola-irse 250ms 1350ms var(--ease-out) forwards;
+}
+.pokebola-cerrar .pokebola-tapa {
+  animation: tapa-cerrar 200ms 760ms var(--ease-out) both;
+}
+.pokebola-cerrar .pokebola-haz {
+  background: linear-gradient(
+    to top,
+    rgba(235, 40, 30, 0.95),
+    rgba(240, 60, 40, 0.75) 55%,
+    rgba(240, 60, 40, 0)
+  );
+  animation: haz-subir 600ms 150ms var(--ease-out);
+}
+.cuerpo-desaparece .sprite {
+  animation: poke-volver 550ms 200ms ease-in both;
+  transform-origin: 50% 100%;
+}
+
+@keyframes burbuja-entrar {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+@keyframes bola-caer {
+  0% {
+    transform: translateY(-170px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  65% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(-14px);
+  }
+  92% {
+    transform: translateY(0);
+  }
+  96% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes bola-sacudir {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  15% {
+    transform: rotate(-14deg);
+  }
+  30% {
+    transform: rotate(12deg);
+  }
+  50% {
+    transform: rotate(-9deg);
+  }
+  65% {
+    transform: rotate(6deg);
+  }
+  80% {
+    transform: rotate(-3deg);
+  }
+}
+@keyframes bola-irse {
+  to {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+@keyframes bola-llegar {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.8);
+  }
+}
+@keyframes tapa-abrir {
+  to {
+    transform: rotate(-115deg) translateX(-2px);
+  }
+}
+@keyframes tapa-cerrar {
+  from {
+    transform: rotate(-115deg) translateX(-2px);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes halo-estallar {
+  0% {
+    opacity: 1;
+    transform: scale(0.15);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+@keyframes rayos-girar {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4) rotate(50deg);
+  }
+}
+@keyframes haz-subir {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.1) scaleX(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: scaleY(1) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(1.1) scaleX(0.3);
+  }
+}
+@keyframes onda-abrir {
+  0% {
+    opacity: 1;
+    transform: scale(0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+@keyframes chispa-volar {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) scale(0.4);
+  }
+}
+/* Sale como silueta blanca, crece un poco de más y se asienta con su color. */
+@keyframes poke-aparecer {
+  0% {
+    opacity: 0;
+    transform: scale(0.15);
+    filter: brightness(0) invert(1) drop-shadow(0 0 2px #ffd23f) drop-shadow(0 0 8px #ffd23f);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+    filter: brightness(0) invert(1) drop-shadow(0 0 2px #ffd23f) drop-shadow(0 0 8px #ffd23f);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1) invert(0) drop-shadow(0 0 0 rgba(255, 210, 63, 0))
+      drop-shadow(0 0 0 rgba(255, 210, 63, 0));
+  }
+}
+/* Al volver se tiñe de rojo y se encoge hacia la bola. */
+@keyframes poke-volver {
+  0% {
+    transform: scale(1);
+    filter: brightness(1) invert(0) sepia(0) saturate(100%) hue-rotate(0deg) brightness(1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(0) invert(19%) sepia(96%) saturate(5000%) hue-rotate(355deg) brightness(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.1);
+    filter: brightness(0) invert(19%) sepia(96%) saturate(5000%) hue-rotate(355deg) brightness(1.1);
+  }
+}
+
+/* Sin movimiento: la pokébola no se dibuja y el Pokémon y la burbuja aparecen o se van de golpe. */
+@media (prefers-reduced-motion: reduce) {
+  .pokebola {
+    display: none;
+  }
+  .burbuja,
+  .chip,
+  .chip-punto,
+  .objeto-lugar,
+  .verbo-puntos span,
+  .pokebola *,
+  .cuerpo-aparece .sprite,
+  .cuerpo-desaparece .sprite {
+    animation: none;
+  }
+  .cuerpo-desaparece .sprite {
+    opacity: 0;
+  }
+  .ps-nivel,
+  .cuerpo-alto,
+  .sombra {
+    transition: none;
+  }
+  /* Sin movimiento al arrastrar: la sombra basta para decir que está en el aire. */
+  .cuerpo-alzado .cuerpo-alto {
+    transform: none;
+  }
+  .burbuja,
+  .chip,
+  .objeto-lugar {
+    animation: aparecer-quieto 120ms linear;
+  }
+  .chip:active {
+    transform: none;
+  }
+}
+@keyframes aparecer-quieto {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Solo para el lector de pantalla: no se ve ni ocupa sitio. */
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* El poder de un golpe: sale del Pokémon y vuela hasta el objeto. Va hacia la derecha; a la izquierda se voltea
+   entero. Son las hojas originales del juego, a la misma escala que el Pokémon y sin suavizar. */
+.poder-lugar {
+  --poder-distancia: 66px;
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.poder-izquierda {
+  transform: scaleX(-1);
+}
+/* Invisibles salvo mientras corre su animación: antes de que el golpe conecte no se ve nada. */
+.poder-proyectil,
+.poder-impacto {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  opacity: 0;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.poder-impacto {
+  left: var(--poder-distancia);
+}
+@keyframes poder-volar {
+  0% {
+    opacity: 1;
+    transform: translateX(12px);
+  }
+  99% {
+    opacity: 1;
+    transform: translateX(var(--poder-distancia));
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(var(--poder-distancia));
+  }
+}
+@keyframes poder-cuadros {
+  to {
+    background-position-x: var(--recorrido);
+  }
+}
+@keyframes poder-ver {
+  from,
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .poder-lugar {
+    display: none;
+  }
+}
+
+/* Un subagente como Pokémon ayudante, formado junto al suyo. Entra a pasos, como salido de una pokébola. */
+.ayudante {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  animation: ayudante-entrar 320ms steps(4, end);
+}
+.ayudante-rotulo {
+  margin-bottom: 4px;
+  padding: 1px 6px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(38, 34, 28, 0.88);
+  color: #f6efdc;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.verbo-pasos {
+  font-weight: 500;
+  opacity: 0.75;
+}
+@keyframes ayudante-entrar {
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ayudante {
+    animation: none;
+  }
+}
+
+/* El suelo: pasticos pequeños que brotan cerca de cada Pokémon. Detrás de ellos, sin mouse. Brotan y se recogen
+   a pasos desde la base, sin suavizar. */
+.entorno {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 0;
+  pointer-events: none;
+}
+.adorno {
+  position: absolute;
+  bottom: 0;
+  display: block;
+  transform-origin: 50% 100%;
+  transform: scaleY(0);
+  opacity: 0;
+  transition:
+    transform 240ms steps(3, end),
+    opacity 240ms steps(3, end);
+}
+.adorno-visible {
+  transform: scaleY(1);
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .adorno {
+    transition: none;
+  }
+}
+
+/* Junto a la barra de PS: la estrella del shiny y las medallas que ha dado la persona. */
+.ps-shiny {
+  color: #d4a02f;
+  font-weight: 800;
+  line-height: 1;
+}
+.ps-medallas {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.ps-medalla {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d4a02f;
+  box-shadow: inset 0 0 0 2px #8a6a1c;
+}
+
+/* ── La sesión a la vista: ficha, acciones, historial, ayuda, respuestas con formato ── */
+.ficha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(38, 34, 28, 0.18);
+}
+.ficha-datos {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(38, 34, 28, 0.66);
+}
+.ficha-acciones {
+  flex: none;
+  display: flex;
+  gap: 4px;
+}
+/* Botón pequeño de la ficha: discreto hasta que hace falta. */
+.mini {
+  padding: 1px 7px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--tinta);
+  background: transparent;
+  border: 1.5px solid rgba(38, 34, 28, 0.45);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mini:hover {
+  background: #ebe4d0;
+}
+.mini:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 2px;
+}
+.mini[aria-pressed="true"] {
+  background: var(--tinta);
+  color: var(--papel);
+  border-color: var(--tinta);
+}
+.mini-detener {
+  color: #fff;
+  background: var(--rojo);
+  border-color: var(--rojo);
+}
+.mini-detener:hover {
+  background: #b93426;
+}
+.mini-ayuda {
+  min-width: 20px;
+  padding: 1px 0;
+}
+
+.respuesta {
+  position: relative;
+}
+.respuesta-copiar {
+  display: block;
+  margin: 6px 0 0 auto;
+}
+.md {
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+.md p {
+  margin: 0 0 6px;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md-titulo {
+  font-weight: 700;
+}
+.md-lista {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.md-lista li {
+  margin: 1px 0;
+}
+.md code,
+.md-codigo {
+  font:
+    11.5px / 1.4 ui-monospace,
+    "SF Mono",
+    monospace;
+  background: #ebe4d0;
+  border-radius: 3px;
+}
+.md code {
+  padding: 0 3px;
+}
+.md-codigo {
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+/* Registro en vivo: lo que hace el Pokémon, completo y con scroll propio dentro de la burbuja. */
+.burbuja-viva {
+  display: flex;
+  flex-direction: column;
+  /* Un solo desplazamiento: el del registro. Lo demás (ficha, tareas, campo) queda fijo y a la vista. */
+  overflow: hidden;
+  max-height: min(70vh, 520px, var(--alto-disp, 520px));
+}
+.burbuja-viva > * {
+  flex: none;
+}
+.registro-caja {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(58, 52, 43, 0.18);
+  min-height: 0;
+}
+.burbuja-viva > .registro-caja {
+  flex: 1 1 140px;
+  min-height: 96px;
+}
+.registro-titulo {
+  margin-bottom: 3px;
+}
+.registro-marco {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.registro {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 4px 2px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+/* Ya terminó: el registro va en línea dentro de la burbuja, que es la que se desplaza (sin desplazamientos anidados). */
+.registro-repaso .registro {
+  overflow-y: visible;
+}
+.burbuja-viva .burbuja-texto {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.burbuja-viva .progreso-en-burbuja {
+  max-height: 96px;
+  overflow-y: auto;
+}
+.registro-ayudante {
+  margin: 0;
+  padding-left: 6px;
+  border-left: 2px solid rgba(38, 34, 28, 0.3);
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+.registro:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: 1px;
+}
+.registro > * + * {
+  margin-top: 5px;
+}
+.registro .md p {
+  margin-bottom: 4px;
+}
+.registro-pensando {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.7;
+  white-space: pre-wrap;
+}
+.registro-accion {
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font:
+    11.5px / 1.4 ui-monospace,
+    "SF Mono",
+    monospace;
+  white-space: pre-wrap;
+}
+.registro-marca {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  background: var(--tinta);
+  transform: translateY(-1px);
+}
+.registro-omitido {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.6;
+}
+.registro-ir {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  background: var(--tinta);
+  color: var(--papel);
+}
+.registro-hecho {
+  margin-top: 6px;
+  border-top: 1px solid rgba(58, 52, 43, 0.18);
+}
+.registro-hecho summary {
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.panel-vacio {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: rgba(38, 34, 28, 0.66);
+}
+.historial,
+.ayuda {
+  max-height: 190px;
+  overflow-y: auto;
+}
+.historial {
+  margin-bottom: 8px;
+}
+.historial-item {
+  border-bottom: 1px solid rgba(38, 34, 28, 0.14);
+}
+.historial-item summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.historial-item summary::-webkit-details-marker {
+  display: none;
+}
+.historial-item summary::before {
+  content: "";
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 5px solid var(--tinta);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 140ms var(--ease-out);
+}
+.historial-item[open] summary::before {
+  transform: rotate(90deg);
+}
+.historial-orden {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.historial-item[open] .historial-orden {
+  white-space: normal;
+}
+.historial-hora {
+  flex: none;
+  font-size: 10px;
+  color: rgba(38, 34, 28, 0.6);
+}
+.historial-item .md,
+.historial-item .panel-vacio {
+  margin: 0 0 6px 13px;
+  font-size: 12px;
+}
+
+.ayuda {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.ayuda dt {
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(38, 34, 28, 0.62);
+}
+.ayuda dt:first-child {
+  margin-top: 0;
+}
+.ayuda dd {
+  margin: 0;
+}
+.ayuda kbd {
+  padding: 0 4px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  border: 1.5px solid rgba(38, 34, 28, 0.45);
+  border-radius: 3px;
+}
+
+/* Permiso: quién, qué va a hacer en palabras, el detalle, y Sí/No en extremos opuestos. */
+.permiso-quien {
+  margin: 0 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(38, 34, 28, 0.62);
+}
+.permiso-resumen {
+  font-weight: 700;
+}
+.permiso-herramienta {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 700;
+  opacity: 0.6;
+}
+.botones-permiso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Lista de tareas de Claude Code dentro del cuadro de la tarea. */
+.progreso-pendientes {
+  margin: 3px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pendiente {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-top: 2px;
+}
+.pendiente-marca {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  transform: translateY(1px);
+}
+.pendiente-hecha {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.pendiente-hecha .pendiente-marca {
+  background: currentColor;
+}
+.pendiente-en_curso {
+  font-weight: 700;
+}
+.pendiente-en_curso .pendiente-marca {
+  border-color: #f2c94c;
+  background: #f2c94c;
+}
+
+/* El oído a la vista y la respuesta sin leer, junto a la barra de PS. */
+.oido-oyendo {
+  background: var(--verde);
+}
+.oido-transcribiendo {
+  background: #8f6c0a;
+}
+.oido-dictando {
+  background: var(--rojo);
+}
+.ps-sin-leer {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--rojo);
+  border: 1.5px solid var(--papel);
+  border-radius: 50%;
+}
+
+/* Texto grande (clic derecho): lo que se lee crece; los sprites no. */
+.texto-grande .burbuja {
+  font-size: 15px;
+}
+.texto-grande .md code,
+.texto-grande .md-codigo,
+.texto-grande .permiso-detalle,
+.texto-grande .historial-item .md,
+.texto-grande .ayuda,
+.texto-grande .escribir-campo {
+  font-size: 13.5px;
+}
+.texto-grande .ficha-datos,
+.texto-grande .mini,
+.texto-grande .progreso,
+.texto-grande .verbo {
+  font-size: 12.5px;
+}
+.texto-grande .progreso-en-burbuja {
+  font-size: 13.5px;
+}
+
+/* Recorrido de la primera vez: una tarjeta arriba, al centro, del mismo papel que las burbujas. */
+.recorrido {
+  position: fixed;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: 360px;
+  padding: 12px 14px;
+  background: var(--papel);
+  border: 2px solid var(--borde);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 rgba(38, 34, 28, 0.35);
+  animation: recorrido-entrar 220ms var(--ease-out);
+}
+@keyframes recorrido-entrar {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+}
+.recorrido-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.recorrido-paso {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(38, 34, 28, 0.62);
+}
+.recorrido-puntos {
+  display: flex;
+  gap: 4px;
+}
+.punto {
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--tinta);
+  border-radius: 2px;
+}
+.punto-hecho {
+  background: var(--tinta);
+}
+.punto-actual {
+  background: #f2c94c;
+}
+.recorrido-titulo {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.recorrido-texto {
+  margin: 0 0 8px;
+}
+.recorrido-haz {
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  font-weight: 700;
+  background: #ebe4d0;
+  border-left: 3px solid #f2c94c;
+  border-radius: 3px;
+}
+.recorrido-hecho {
+  border-left-color: var(--verde);
+}
+.recorrido-botones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.recorrido-botones .boton,
+.recorrido-botones .mini {
+  min-height: 24px;
+}
+/* "Saltar" queda al borde, lejos de los dos botones de moverse. */
+.recorrido-saltar {
+  margin-left: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .recorrido {
+    animation: none;
+  }
+}
+
+/* Laboratorio de la primera vez: una tarjeta al centro, del mismo papel que el recorrido, sobre un velo suave. */
+.lab-velo {
+  position: fixed;
+  inset: 0;
+  background: rgba(38, 34, 28, 0.32);
+  animation: lab-velar 300ms var(--ease-out);
+}
+@keyframes lab-velar {
+  from {
+    opacity: 0;
+  }
+}
+.lab {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  width: 424px;
+  padding: 14px 16px 12px;
+  background: var(--papel);
+  border: 2px solid var(--borde);
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 rgba(38, 34, 28, 0.35);
+  animation: lab-entrar 260ms var(--ease-out);
+}
+@keyframes lab-entrar {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px));
+  }
+}
+.lab-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.lab-etiqueta {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(38, 34, 28, 0.62);
+}
+.lab .mini {
+  min-height: 24px;
+  min-width: 24px;
+}
+.lab-titulo:focus-visible {
+  outline: none;
+}
+.lab-titulo {
+  margin: 0 0 2px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.lab-ayuda {
+  margin: 0;
+  color: rgba(38, 34, 28, 0.78);
+}
+/* Donde se asoma el Pokémon: el suelo es una línea de píxeles; lo que salta o dispara se sale por arriba. */
+.lab-escenario {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 168px;
+  margin-top: 6px;
+  border-bottom: 2px solid var(--borde);
+}
+.lab-asoma,
+.lab-sale {
+  position: relative;
+  transform-origin: 50% 100%;
+}
+.lab-asoma {
+  animation: lab-asomar 240ms var(--ease-out);
+}
+@keyframes lab-asomar {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.9);
+  }
+}
+.lab-sale-anima .sprite {
+  animation: poke-aparecer 700ms var(--ease-out) both;
+  transform-origin: 50% 100%;
+}
+.lab-ficha {
+  min-height: 74px;
+  padding: 8px 0 14px;
+}
+.lab-nombre {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.lab-datos {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0;
+}
+.lab-dato {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #ebe4d0;
+  border: 1.5px solid rgba(38, 34, 28, 0.45);
+  border-radius: 4px;
+}
+.lab-tipo-color {
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--tinta);
+  border-radius: 2px;
+}
+.lab-resumen {
+  margin: 0;
+}
+/* Cuatro pokébolas en fila; el foco, el cursor o la elegida las marcan con el mismo trazo de las tarjetas. */
+.lab-bolas {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+.lab-bola {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  box-sizing: border-box;
+  width: 80px;
+  min-height: 84px;
+  padding: 6px 4px 5px;
+  font: inherit;
+  color: var(--tinta);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 120ms linear;
+}
+.lab-bola:hover,
+.lab-bola[aria-checked="true"] {
+  background: #ebe4d0;
+  border-color: var(--borde);
+  transform: translateY(-3px);
+}
+.lab-bola:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 2px;
+}
+/* La pokébola mide 30x27 como en la escena; aquí se dibuja al doble, con píxeles enteros. */
+.lab-bola-dibujo {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 27px;
+  margin-bottom: 14px;
+  transform: scale(2);
+  transform-origin: 50% 100%;
+}
+.pokebola-fija {
+  position: relative;
+  width: 30px;
+  height: 27px;
+}
+.lab-bola-nombre {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lab-bolas[hidden] {
+  display: none;
+}
+.lab-pie {
+  min-height: 46px;
+  padding-top: 6px;
+}
+.lab-pie-fila {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* El huevo de pascua: casi texto de ayuda. Sin subrayado ni borde hasta que se pasa el cursor o se llega con Tab. */
+.lab-otro {
+  flex: none;
+  padding: 1px 2px;
+  font: inherit;
+  font-size: 11px;
+  color: rgba(38, 34, 28, 0.68);
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 120ms linear;
+}
+.lab-otro:hover,
+.lab-otro:focus-visible {
+  color: var(--tinta);
+  text-decoration: underline;
+}
+.lab-otro:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 2px;
+}
+/* La Pokédex de Kanto: búsqueda y cuadrícula de seis columnas, con sus sprites quietos. Mide siempre lo mismo. */
+.lab-pokedex {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Cuatro filas de la cuadrícula si la pantalla da; en una baja, las dos de siempre. */
+  height: clamp(172px, calc(100vh - 520px), 316px);
+  margin: 6px 0 4px;
+}
+.lab-pokedex-oculta {
+  visibility: hidden;
+}
+.lab-busqueda {
+  width: 100%;
+  flex: none;
+  min-height: 28px;
+  font-size: 13px;
+}
+.lab-vacio {
+  padding: 18px 0;
+  text-align: center;
+}
+.lab-cuadricula {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  padding: 2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.lab-celda {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+  box-sizing: border-box;
+  height: 66px;
+  padding: 2px 0 2px;
+  font: inherit;
+  color: var(--tinta);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.lab-celda:hover,
+.lab-celda[aria-selected="true"] {
+  background: #ebe4d0;
+  border-color: var(--borde);
+}
+.lab-celda:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 1px;
+}
+.sprite-quieto {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+.lab-celda-num {
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: rgba(38, 34, 28, 0.7);
+}
+.lab-nota {
+  margin: 0;
+  font-size: 11.5px;
+  color: rgba(38, 34, 28, 0.7);
+}
+.lab-confirmar,
+.lab-union {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lab-se-une {
+  white-space: nowrap;
+}
+.lab-pregunta,
+.lab-se-une {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.lab-botones {
+  display: flex;
+  gap: 8px;
+}
+/* El paso del nombre: la pregunta y el campo en una fila, la pista debajo, y Atrás / Listo a la derecha. */
+.lab-bautizo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lab-se-une-corto {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(38, 34, 28, 0.7);
+}
+.lab-bautizo-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lab-campo {
+  box-sizing: border-box;
+  width: 168px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tinta);
+  background: #fffdf6;
+  border: 2px solid var(--borde);
+  border-radius: 4px;
+}
+.lab-campo:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 2px;
+}
+.lab-campo[aria-invalid="true"] {
+  border-color: #a3281b;
+}
+.lab-error {
+  margin: 0;
+  padding-left: 8px;
+  border-left: 3px solid #a3281b;
+  font-size: 12px;
+  font-weight: 600;
+  color: #a3281b;
+}
+.lab-botones-fin {
+  justify-content: flex-end;
+}
+/* El paso del modelo: tres filas-radio con el mismo papel y borde que el campo del nombre; la marcada, como la bola enfocada. */
+.lab-modelos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lab-modelo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+  min-height: 30px;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--tinta);
+  text-align: left;
+  background: #fffdf6;
+  border: 2px solid var(--borde);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.lab-modelo:hover {
+  background: #ebe4d0;
+}
+.lab-modelo[aria-checked="true"] {
+  background: #ebe4d0;
+  box-shadow: inset 4px 0 0 var(--tinta);
+  padding-left: 12px;
+}
+.lab-modelo:focus-visible {
+  outline: 2px solid #2f6fd8;
+  outline-offset: 2px;
+}
+.lab-modelo-nombre {
+  font-size: 15px;
+  font-weight: 700;
+}
+.lab-modelo-tipo {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(38, 34, 28, 0.7);
+}
+.lab-modelo-linea {
+  font-size: 12px;
+  color: rgba(38, 34, 28, 0.78);
+}
+.lab-botones .boton {
+  min-height: 28px;
+}
+
+/* La ceremonia (≈3 s): las otras tres se apagan, la elegida va al centro, se sacude, se abre y sale el Pokémon.
+   Reutiliza los cuadros de la pokébola de la escena con otros tiempos: sacude desde 0 y abre a los 850 ms. */
+.lab-bola.lab-bola-apagada {
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 360ms linear,
+    transform 360ms var(--ease-out);
+  pointer-events: none;
+}
+/* Dos clases: con el teclado la elegida sigue con aria-checked, y `.lab-bola[aria-checked="true"]` (más arriba) le
+   ganaba en especificidad: la bola no iba al centro y se quedaba la tarjeta beige vacía tras abrirse. */
+.lab-bola.lab-bola-elegida,
+.lab-bola.lab-bola-elegida:hover {
+  background: transparent;
+  border-color: transparent;
+  transform: translateX(var(--dx));
+  transition: transform 460ms var(--ease-out);
+  z-index: 1;
+}
+.lab-bola.lab-bola-elegida .lab-bola-nombre {
+  visibility: hidden;
+}
+.lab-ceremonia .pokebola-abrir .pokebola-bola {
+  animation:
+    bola-sacudir 280ms 3 ease-in-out,
+    bola-irse 300ms 1000ms var(--ease-out) forwards;
+}
+.lab-ceremonia .pokebola-abrir .pokebola-tapa {
+  animation: tapa-abrir 220ms 850ms var(--ease-out) forwards;
+}
+.lab-ceremonia .pokebola-abrir .pokebola-halo {
+  animation: halo-estallar 650ms 850ms var(--ease-out);
+}
+.lab-ceremonia .pokebola-abrir .pokebola-rayos {
+  animation: rayos-girar 800ms 850ms var(--ease-out);
+}
+.lab-ceremonia .pokebola-abrir .pokebola-haz {
+  animation: haz-subir 650ms 870ms var(--ease-out);
+}
+.lab-ceremonia .pokebola-abrir .pokebola-onda {
+  animation: onda-abrir 550ms 850ms var(--ease-out);
+}
+.lab-ceremonia .pokebola-abrir .chispa {
+  animation: chispa-volar 650ms 880ms var(--ease-out);
+}
+
+/* Sin movimiento: nada se asoma, sacude ni brilla; el Pokémon aparece quieto con su texto. */
+/* Tarjeta final mientras carga el equipo: se mira, no se toca. */
+.lab-preparando {
+  pointer-events: none;
+}
+.lab-preparando .lab-nota {
+  animation: lab-respirar 1.4s ease-in-out infinite alternate;
+}
+@keyframes lab-respirar {
+  from {
+    opacity: 0.55;
+  }
+}
+.lab-caido .lab-botones {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lab-velo,
+  .lab,
+  .lab-preparando .lab-nota,
+  .lab-asoma,
+  .lab-sale-anima .sprite {
+    animation: none;
+  }
+  .lab-bola,
+  .lab-bola:hover,
+  .lab-bola[aria-checked="true"],
+  .lab-bola.lab-bola-apagada,
+  .lab-bola.lab-bola-elegida,
+  .lab-bola.lab-bola-elegida:hover {
+    transition: none;
+    transform: none;
+  }
+  .lab-bola.lab-bola-apagada,
+  .lab-bola.lab-bola-elegida {
+    opacity: 0;
+  }
+}
+
+/* Preparación del primer arranque: su propia ventana (con marco), con el papel y los bordes de las tarjetas del laboratorio. */
+body.preparacion,
+body.preparacion #raiz {
+  background: var(--papel);
+  overflow: hidden;
+}
+.prep {
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.prep .lab-titulo {
+  font-size: 19px;
+}
+.prep .lab-titulo:focus-visible {
+  outline: none;
+}
+.prep .mini {
+  min-height: 30px;
+  min-width: 78px;
+  font-size: 12px;
+}
+.prep-primario {
+  color: var(--papel);
+  background: var(--tinta);
+  border-color: var(--tinta);
+}
+.prep-primario:hover {
+  background: #3b352b;
+}
+.prep-lista {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0 2px 0 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.prep-archivo {
+  padding: 5px 8px;
+  background: #fffdf6;
+  border: 1.5px solid rgba(38, 34, 28, 0.45);
+  border-radius: 4px;
+}
+.prep-archivo[data-estado="listo"] {
+  border-color: var(--verde);
+}
+.prep-archivo[data-estado="error"] {
+  border-color: #a3281b;
+}
+.prep-archivo-fila,
+.prep-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.prep-archivo-nombre {
+  font-weight: 700;
+}
+.prep-archivo-dato,
+.prep-total {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(38, 34, 28, 0.78);
+}
+.prep-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tinta);
+}
+.prep-barra {
+  height: 10px;
+  margin-top: 4px;
+  overflow: hidden;
+  background: #fffdf6;
+  border: 2px solid var(--borde);
+  border-radius: 3px;
+}
+.prep-barra-relleno {
+  height: 100%;
+  background: var(--tinta);
+  transition: width 160ms linear;
+}
+.prep-archivo .prep-barra {
+  height: 7px;
+  border-width: 1.5px;
+}
+.prep .lab-botones-fin {
+  margin-top: auto;
+  padding-top: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .prep-barra-relleno {
+    transition: none;
+  }
+}

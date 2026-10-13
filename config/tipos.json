@@ -1,0 +1,122 @@
+{
+  "electrico": {
+    "modelo": "sonnet",
+    "especialidad": "Eres rápido: búsquedas en el código, lecturas y tareas cortas. Si la tarea pide diseño o cambios grandes, dilo y sugiere pasársela a otro.",
+    "movimiento": {
+      "nombre": "Impactrueno",
+      "comando": "/audit-perf"
+    }
+  },
+  "psiquico": {
+    "modelo": "opus",
+    "especialidad": "Tu fuerte es la arquitectura: antes de tocar código planteas el diseño y un plan corto.",
+    "movimiento": {
+      "nombre": "Psíquico",
+      "comando": "/plan-feature"
+    }
+  },
+  "fantasma": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es cazar bugs: reproduces el fallo antes de arreglarlo y buscas la causa de raíz.",
+    "movimiento": {
+      "nombre": "Bola sombra",
+      "comando": "Busca la causa de raíz del último error; reprodúcelo antes de arreglarlo."
+    }
+  },
+  "lucha": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es la revisión de código: buscas errores reales, no estilo.",
+    "movimiento": {
+      "nombre": "Esfera aural",
+      "comando": "Revisa los cambios sin confirmar de este repo y dime los errores reales que veas, del más grave al menos grave."
+    }
+  },
+  "planta": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte son las pruebas: las escribes primero y dejas todo en verde.",
+    "movimiento": {
+      "nombre": "Hoja afilada",
+      "comando": "Corre las pruebas del proyecto y arregla las que fallen."
+    }
+  },
+  "fuego": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte son los despliegues: verificas que todo esté limpio y en verde antes de publicar, y pides confirmación antes de tocar producción.",
+    "movimiento": {
+      "nombre": "Lanzallamas",
+      "comando": "/ship"
+    }
+  },
+  "agua": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es dejar el código limpio: quitas lo muerto y lo duplicado sin cambiar el comportamiento.",
+    "movimiento": {
+      "nombre": "Pistola agua",
+      "comando": "Limpia lo último que tocaste: quita código muerto y duplicados, sin cambiar el comportamiento."
+    }
+  },
+  "hada": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es la interfaz: cuidas el detalle visual y la accesibilidad.",
+    "movimiento": {
+      "nombre": "Canto",
+      "comando": "/audit-a11y"
+    }
+  },
+  "bicho": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es la documentación: README, comentarios y notas de cambios al día.",
+    "movimiento": {
+      "nombre": "Pin misil",
+      "comando": "Documenta lo último que tocaste: actualiza el README y los comentarios que hayan quedado viejos, sin cambiar el comportamiento."
+    }
+  },
+  "veneno": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es la seguridad: buscas secretos expuestos, entradas sin validar y dependencias riesgosas.",
+    "movimiento": {
+      "nombre": "Bomba lodo",
+      "comando": "Revisa los cambios sin confirmar buscando fallos de seguridad: secretos expuestos, entradas sin validar y dependencias riesgosas."
+    }
+  },
+  "tierra": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte son los datos: esquemas, migraciones y consultas.",
+    "movimiento": {
+      "nombre": "Terremoto",
+      "comando": "Revisa el esquema y las migraciones pendientes y dime qué riesgos ves antes de aplicarlas."
+    }
+  },
+  "roca": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es el rendimiento: mides antes de optimizar.",
+    "movimiento": {
+      "nombre": "Lanzarrocas",
+      "comando": "Mide el rendimiento de lo último que tocaste y dime dónde está el cuello de botella real antes de cambiar nada."
+    }
+  },
+  "hielo": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte es investigar con calma: lees mucho antes de opinar y no tocas nada.",
+    "movimiento": {
+      "nombre": "Rayo hielo",
+      "comando": "Investiga cómo está hecho esto en el repo y resúmelo en cinco líneas, sin tocar nada."
+    }
+  },
+  "dragon": {
+    "modelo": "sonnet",
+    "especialidad": "Tu fuerte son las tareas grandes: las partes en pasos pequeños y las terminas.",
+    "movimiento": {
+      "nombre": "Garra dragón",
+      "comando": "Divide la tarea en pasos pequeños, dime el plan en cinco líneas y empieza por el primero."
+    }
+  },
+  "normal": {
+    "modelo": "sonnet",
+    "especialidad": "Haces de todo un poco.",
+    "movimiento": {
+      "nombre": "Placaje",
+      "comando": "Haz lo siguiente que falte de la tarea en la que vamos."
+    }
+  }
+}
