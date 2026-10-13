@@ -38,6 +38,8 @@ const puente: PuentePoke = {
   alLaboratorio: oir<OrdenLaboratorio>(CANALES.laboratorio),
   pedirLaboratorio: () => ipcRenderer.send(CANALES.pedirLaboratorio),
   inicial: (respuesta) => ipcRenderer.send(CANALES.inicial, respuesta),
+  pedirEspecie: (especie, eleccion) => ipcRenderer.send(CANALES.pedirEspecie, { especie, eleccion }),
+  alEspecieLab: oir<unknown>(CANALES.especieLab),
   labListo: () => ipcRenderer.send(CANALES.labListo),
   labFallo: () => ipcRenderer.send(CANALES.labFallo),
   elegir: (pokemonId) => ipcRenderer.send(CANALES.elegir, { pokemonId }),

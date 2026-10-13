@@ -45,8 +45,8 @@ import { movimientosDe, nombresDeMovimientos, validarConfigTipos } from "./pokem
 import { elegirVoz, validarConfigVoces } from "./pokemon/voces";
 import { alternarQuieto, guardarPreferencias, leerPreferencias, type Preferencias } from "./preferencias";
 import { prepararPrimerArranque, traerPreparacionAlFrente } from "./preparacion-ventana";
-import { primeraVez, type RespuestaLab, validarRespuestaLab } from "./primera-vez";
-import { atenderRecursos, carpetaEspecie, leerAnims, registrarEsquema } from "./recursos";
+import { primeraVez, type RespuestaLab, validarPedidoEspecie, validarRespuestaLab } from "./primera-vez";
+import { atenderRecursos, carpetaEspecie, especieEnDisco, leerAnims, registrarEsquema } from "./recursos";
 import { RUTAS } from "./rutas";
 import { SesionClaude } from "./sesion/claude";
 import { diagnosticarClaude, mensajeDeDiagnostico, rutaClaudeIncluido } from "./sesion/claude-incluido";
@@ -278,10 +278,23 @@ async function arrancar(): Promise<void> {
   let ordenLab: OrdenLaboratorio | null = null;
   let alResponderLab: ((r: RespuestaLab) => void) | null = null;
   let abrirLab: OrdenLaboratorio | null = null;
+  /** Las especies ofrecidas que ya están completas en disco ahora mismo (se vuelve a mirar en cada "abrir", también al recargar). */
+  let listasLab: () => number[] = () => [];
+  /** El laboratorio está a la vista: solo entonces se le avisa de lo que va llegando. */
+  let labAbierto = false;
+  /** Pedir bajar una especie desde el laboratorio; solo existe mientras dura la primera vez. */
+  let alPedirLab: ((dato: unknown) => void) | null = null;
+  const avisarLlegada = (especie: number, ok: boolean) => {
+    if (labAbierto && !win.isDestroyed()) win.webContents.send(CANALES.especieLab, { especie, ok });
+  };
   const mandarOrdenLab = () => {
     // Una recarga del renderer durante el diálogo de carpeta (orden "volver") reabre el laboratorio.
     const orden = ordenLab?.tipo === "volver" ? abrirLab : ordenLab;
-    if (orden && !win.isDestroyed()) win.webContents.send(CANALES.laboratorio, orden);
+    if (orden && !win.isDestroyed())
+      win.webContents.send(
+        CANALES.laboratorio,
+        orden.tipo === "abrir" ? { ...orden, listas: listasLab() } : orden,
+      );
   };
   // Tras la primera vez la tarjeta final sigue a la vista hasta que el equipo está en pantalla (o pasa el plazo).
   let despedidaPendiente = false;
@@ -314,7 +327,25 @@ async function arrancar(): Promise<void> {
       console.warn("El laboratorio falló al dibujarse: la ventana queda libre.");
       puerta.fallo();
     },
+    alPedirEspecie: (dato) => alPedirLab?.(dato),
+    // Solo el marco principal de la propia ventana (no un subframe ni otra página).
+    esRemitente: (e) => (e as { senderFrame?: unknown }).senderFrame === win.webContents.mainFrame,
   });
+
+  // Sprites de las demás especies: en cuanto termina la preparación empiezan a bajar en segundo plano (en la primera
+  // vez, mientras la persona mira el laboratorio) y, de inmediato, cualquiera que se pida.
+  const gestor = crearGestor({
+    pasoDe: (especie) => pasoDeEspecieCatalogo(RUTAS, especie),
+    alListo: (especie) => {
+      console.info(`Especie ${especie} bajada.`);
+      avisarLlegada(especie, true);
+    },
+    aviso: (mensaje, error) => console.warn(mensaje, error ?? ""),
+  });
+  // Salir (también desde el laboratorio) aborta la descarga en curso.
+  app.on("will-quit", () => gestor.detener());
+  // `segundoPlano` no duplica la cola: llamarlo otra vez retoma el fondo si se había detenido por falta de red.
+  const iniciarFondo = () => gestor.segundoPlano(especiesDeFondo());
 
   /** Las especies con sus sprites bajados (assets/pokemon/<dex>/anims.json): las únicas que se pueden sacar. */
   const especiesDisponibles = () =>
@@ -324,10 +355,24 @@ async function arrancar(): Promise<void> {
   if (equipo.todos().length === 0) {
     const respaldo = leer<Omit<DatosNuevos, "carpeta" | "nombre" | "especie">>("pokemon-inicial.json");
     const iniciales = inicialesVista(tipos);
-    // La Pokédex de Kanto del laboratorio (huevo de pascua): solo las de Kanto que de verdad están bajadas. Lo que
-    // el renderer responda se valida contra esta misma lista (`primeraVez` no cree lo que llega por IPC).
-    const otras = otrasVista(tipos, especiesDisponibles());
+    // La Pokédex de Kanto del laboratorio (huevo de pascua): siempre las 151, estén o no bajadas todavía (las que
+    // faltan llegan en segundo plano o a demanda). Lo que el renderer responda se valida contra esta misma lista
+    // (`primeraVez` no cree lo que llega por IPC) y, al crear, se comprueba además que sus assets estén completos.
+    const otras = otrasVista(tipos, CATALOGO);
     const ofrecidas = [...iniciales, ...otras.filter((o) => !iniciales.some((i) => i.especie === o.especie))];
+    const especiesOfrecidas = ofrecidas.map((o) => o.especie);
+    listasLab = () => especiesOfrecidas.filter(especieEnDisco);
+    alPedirLab = (dato) => {
+      const pedido = validarPedidoEspecie(dato, especiesOfrecidas);
+      if (pedido === null) return;
+      const { especie } = pedido;
+      if (especieEnDisco(especie)) return avisarLlegada(especie, true);
+      // `pedir` comparte la descarga con la cola de fondo; al terminar se avisa del resultado (también si falló).
+      void gestor
+        .pedir(especie, pedido.eleccion ? "eleccion" : "marca")
+        .then((ok) => avisarLlegada(especie, ok && especieEnDisco(especie)));
+    };
+    iniciarFondo();
     // Salir desde la barra de menú desde el primer momento, y vigilar que la pantalla no muera con la ventana tomada.
     const bandejaSalir = crearBandejaSalir();
     let primeraVezActiva = true;
@@ -343,11 +388,14 @@ async function arrancar(): Promise<void> {
     const nuevo = await primeraVez({
       iniciales: ofrecidas,
       mostrar: (o) => {
+        labAbierto = o.tipo !== "cerrar";
+        if (o.tipo === "volver" && o.fallo !== undefined) avisarLlegada(o.fallo, false);
         if (o.tipo === "abrir") {
           abrirLab = {
             tipo: "abrir",
             iniciales,
             otras,
+            listas: [],
             nombres: {
               reservadas,
               mando,
@@ -358,10 +406,16 @@ async function arrancar(): Promise<void> {
         } else if (o.tipo === "volver") puerta.volver();
         else puerta.cerrar();
         // Al cerrar, la tarjeta final se queda (sin clics) hasta que el equipo esté en pantalla.
-        ordenLab = o.tipo === "abrir" ? abrirLab : o.tipo === "cerrar" ? { tipo: "preparando" } : o;
+        ordenLab =
+          o.tipo === "abrir" ? abrirLab : o.tipo === "cerrar" ? { tipo: "preparando" } : { tipo: "volver" };
         // "volver" llega al renderer tal cual; en una recarga se manda "abrir".
         if (o.tipo === "volver" && ordenLab) win.webContents.send(CANALES.laboratorio, ordenLab);
         else mandarOrdenLab();
+      },
+      asegurar: async (especie) => {
+        if (especieEnDisco(especie)) return true;
+        // Con prioridad y sin esperar a la cola de fondo; si no llega (sin red, 404) vuelve al laboratorio.
+        return (await gestor.pedir(especie, "eleccion")) && especieEnDisco(especie);
       },
       esperar: () => new Promise<RespuestaLab>((resolver) => (alResponderLab = resolver)),
       elegirCarpeta: (titulo) => {
@@ -392,6 +446,8 @@ async function arrancar(): Promise<void> {
       },
     });
     primeraVezActiva = false;
+    alPedirLab = null;
+    labAbierto = false;
     bandejaSalir.quitar();
     if (!nuevo) {
       // Sin elegir ni carpeta no hay dónde trabajar: no se adivina una.
@@ -592,14 +648,9 @@ async function arrancar(): Promise<void> {
     equipoActivo?.publicar();
   };
 
-  // Sprites de las demás especies: en segundo plano tras arrancar, y de inmediato si alguien pide una que falta.
-  const gestor = crearGestor({
-    pasoDe: (especie) => pasoDeEspecieCatalogo(RUTAS, especie),
-    alListo: (especie) => console.info(`Especie ${especie} bajada.`),
-    aviso: (mensaje, error) => console.warn(mensaje, error ?? ""),
-  });
   // Con los modelos cargados, el resto del catálogo se baja sin molestar (si algo falla, lo retoma el próximo arranque).
-  gestor.segundoPlano(especiesDeFondo());
+  // En la primera vez ya empezó antes de abrir el laboratorio.
+  iniciarFondo();
   /** Una especie del catálogo que se nombró exacta y aún no está en disco: se baja y la llamada sigue al llegar. */
   const alFaltarEspecie = (nombre: string) => {
     const e = resolverExacta(nombre, CATALOGO);

@@ -12,8 +12,11 @@ export interface DepsGestor {
 export interface Gestor {
   /** Pone en cola, sin prisa, lo que falte de estas especies (las ya hechas se saltan). */
   segundoPlano(especies: number[]): void;
-  /** Baja esta especie ya (antes que la cola de fondo). Resuelve true si quedó disponible. */
-  pedir(especie: number): Promise<boolean>;
+  /**
+   * Baja esta especie ya (antes que la cola de fondo). Resuelve true si quedó disponible. Las pedidas por marcar
+   * ("marca", por omisión) esperan en orden de petición; la "eleccion" se pone al frente de todas.
+   */
+  pedir(especie: number, prioridad?: "marca" | "eleccion"): Promise<boolean>;
   /** Corta lo que corra y vacía la cola de fondo (la app se cierra). */
   detener(): void;
 }
@@ -91,15 +94,23 @@ export function crearGestor(deps: DepsGestor): Gestor {
       for (const e of especies) if (!fondo.includes(e) && !esperando.has(e)) fondo.push(e);
       void bucle();
     },
-    pedir(especie) {
+    pedir(especie, prioridad = "marca") {
       detenido = false;
       const previa = esperando.get(especie);
-      if (previa) return previa;
+      if (previa) {
+        // Marcada antes y elegida ahora: pasa al frente de la cola (la misma descarga, la misma promesa).
+        if (prioridad === "eleccion") {
+          const i = urgentes.findIndex((p) => p.especie === especie);
+          if (i > 0) urgentes.unshift(...urgentes.splice(i, 1));
+        }
+        return previa;
+      }
       const promesa = new Promise<boolean>((resolver) => {
         // Si estaba en la cola de fondo, se saca de ahí: ahora es urgente.
         const i = fondo.indexOf(especie);
         if (i >= 0) fondo.splice(i, 1);
-        urgentes.push({ especie, resolver });
+        if (prioridad === "eleccion") urgentes.unshift({ especie, resolver });
+        else urgentes.push({ especie, resolver });
       });
       esperando.set(especie, promesa);
       void bucle();

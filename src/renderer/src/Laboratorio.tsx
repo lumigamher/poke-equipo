@@ -5,6 +5,8 @@ import {
   bolaParaElFoco,
   ESTADO_INICIAL,
   type Evento,
+  estadoEspecie,
+  type Llegadas,
   reducir,
 } from "@compartido/laboratorio";
 import { MODELOS, nombreModelo } from "@compartido/modelos";
@@ -21,6 +23,8 @@ import { animsDe, precargarHojas, Sprite, SpriteQuieto } from "./sprite/Sprite";
 const PASO_BOLA = 88;
 /** Columnas de la cuadrícula de la Pokédex de Kanto (estilos.css: .lab-cuadricula); ↑ y ↓ saltan una fila. */
 const COLUMNAS = 6;
+/** Cuánto se queda el cursor o el foco en una especie por llegar antes de pedirla a main con prioridad. */
+const PAUSA_MARCA_MS = 300;
 /** Qué tan lejos vuela el poder de la ceremonia, en píxeles (a 150 el chapoteo de Squirtle tocaba el borde de la tarjeta). */
 const ALCANCE_PODER = 100;
 const COLOR_TIPO: Record<string, string> = {
@@ -64,17 +68,28 @@ export function Laboratorio({
   nombres,
   volverN,
   preparando,
+  llegadas,
+  pedirEspecie,
+  reintentarEspecie,
 }: {
   iniciales: InicialVista[];
-  /** Las de la Pokédex de Kanto (el huevo de pascua) con sprites; vacía = sin esa opción. */
+  /** Las 151 de la Pokédex de Kanto (el huevo de pascua), estén o no bajadas; vacía = sin esa opción. */
   otras: InicialVista[];
   /** Lo que hace falta para validar el nombre propio mientras se escribe. */
   nombres: NombresLab;
   volverN: number;
   /** Ya eligió y dio la carpeta: la tarjeta final sigue a la vista, sin clics, mientras carga el equipo. */
   preparando: boolean;
+  /** Cuáles de la Pokédex ya tienen sus archivos y cuáles fallaron al bajar (main avisa de cada llegada). */
+  llegadas: Llegadas;
+  /** Pide a main que baje ya esta especie (si falta). */
+  pedirEspecie(especie: number, eleccion: boolean): void;
+  /** Quita el fallo de una especie para que se vuelva a pedir. */
+  reintentarEspecie(especie: number): void;
 }) {
   const total = iniciales.length;
+  /** Lista cuando main dice que sus archivos están en disco (al abrir o al llegar); un fallo de main manda sobre eso. */
+  const estadoDe = useCallback((especie: number) => estadoEspecie(llegadas, especie), [llegadas]);
   const [estado, setEstado] = useState(ESTADO_INICIAL);
   const estadoRef = useRef(estado);
   const enviar = useCallback(
@@ -96,6 +111,7 @@ export function Laboratorio({
     pokedex,
     filtro,
     otra,
+    descarga,
   } = estado;
   const reducido = useReducido();
 
@@ -127,6 +143,8 @@ export function Laboratorio({
       (a) => setAnims((m) => ({ ...m, [especie]: a })),
       (e) => {
         pedidasOtras.current.delete(especie);
+        // Sin hojas no se asoma, pero se puede elegir igual (y la confirmación no queda esperando por ellas).
+        setAnims((m) => ({ ...m, [especie]: {} }));
         console.warn(`Laboratorio: no llegaron las animaciones de la especie ${especie}:`, e);
       },
     );
@@ -322,11 +340,32 @@ export function Laboratorio({
       : elegida === null
         ? null
         : iniciales[elegida];
-  // Quien se marca o se elige en la Pokédex trae sus animaciones (los cuatro de siempre ya las traen).
+  // Quien se marca o se elige en la Pokédex trae sus animaciones, pero solo cuando sus archivos ya están en disco
+  // (los cuatro de siempre ya las traen): pedirlas antes las daría por vacías.
+  const marcadaLista = marcadaEf !== null && estadoDe(marcadaEf) === "lista";
+  const otraLista = otra !== null && estadoDe(otra) === "lista";
   useEffect(() => {
-    if (panelAbierto && marcadaEf !== null) traerAnims(marcadaEf);
-    if (otra !== null) traerAnims(otra);
-  }, [panelAbierto, marcadaEf, otra, traerAnims]);
+    if (panelAbierto && marcadaEf !== null && marcadaLista) traerAnims(marcadaEf);
+    if (otra !== null && otraLista) traerAnims(otra);
+  }, [panelAbierto, marcadaEf, marcadaLista, otra, otraLista, traerAnims]);
+  // Quien se marca (con una pausa, para no pedir todo lo que pasa bajo el cursor) o se elige y aún no está: main
+  // la baja ya, antes que la cola de fondo.
+  const objetivo = otra ?? (panelAbierto ? marcadaEf : null);
+  const objetivoBajando = objetivo !== null && estadoDe(objetivo) === "bajando";
+  const eligiendo = otra !== null;
+  useEffect(() => {
+    if (objetivo === null || !objetivoBajando) return;
+    const t = setTimeout(() => pedirEspecie(objetivo, eligiendo), eligiendo ? 0 : PAUSA_MARCA_MS);
+    return () => clearTimeout(t);
+  }, [objetivo, objetivoBajando, eligiendo, pedirEspecie]);
+  // La máquina se entera de que la elegida llegó (cuando ya se leyeron sus animaciones) o de que falló.
+  const animsOtraCargadas = otra !== null && anims[otra] !== undefined;
+  useEffect(() => {
+    if (otra === null) return;
+    const e = estadoDe(otra);
+    if (e === "lista" && animsOtraCargadas) enviar({ tipo: "llegada", especie: otra, ok: true });
+    else if (e === "fallo") enviar({ tipo: "llegada", especie: otra, ok: false });
+  }, [otra, estadoDe, animsOtraCargadas, enviar]);
   // Solo a quien se eligió se le precargan todas sus hojas (para la ceremonia); a quien solo se marca, nada.
   const animsOtra = otra === null ? undefined : anims[otra];
   useEffect(() => {
@@ -335,7 +374,17 @@ export function Laboratorio({
   const elegirOtra = (especie: number) => {
     ultimaOtra.current = especie;
     setMarcada(especie);
-    enviar({ tipo: "escogerOtra", especie });
+    const e = estadoDe(especie);
+    enviar({ tipo: "escogerOtra", especie, lista: e === "lista" });
+    // Elegir a una que ya había fallado es intentarlo de nuevo.
+    if (e === "fallo") reintentarEspecie(especie);
+  };
+  const reintentar = (especie: number) => {
+    // El botón desaparece al reintentar: el foco va antes a "Sí" (confirmar) o a la celda marcada (elegir).
+    if (estadoRef.current.paso === "confirmar") confirmarRef.current?.focus();
+    else celdas.current.get(especie)?.focus();
+    enviar({ tipo: "reintentar" });
+    reintentarEspecie(especie);
   };
   const alTeclasBusqueda = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown" && marcadaEf !== null) {
@@ -369,6 +418,9 @@ export function Laboratorio({
     celdas.current.get(a)?.focus();
   };
   const enCeremonia = activaCeremonia(paso);
+  // Si quien se asoma aún no llegó (o falló), la ficha lo dice; solo cambia al llegarle a ELLA, no por cada especie
+  // que llega de fondo, así que el lector de pantalla no repite anuncios.
+  const estadoAsomada = asomada ? estadoDe(asomada.especie) : "lista";
   const raiz = roving(enfocada);
   const textoNombre = escrito ?? elegido?.nombre ?? "";
   const resultadoNombre = elegido
@@ -478,7 +530,20 @@ export function Laboratorio({
                   </span>
                   <span className="lab-dato">Modelo {nombreModelo(asomada.modelo)}</span>
                 </p>
-                <p className="lab-resumen">{asomada.resumen}</p>
+                {estadoAsomada === "lista" ? (
+                  <p className="lab-resumen">{asomada.resumen}</p>
+                ) : estadoAsomada === "bajando" ? (
+                  <p id="lab-espera" className="lab-resumen lab-espera">
+                    Bajando a {asomada.nombre}…
+                  </p>
+                ) : (
+                  <p id="lab-espera" className="lab-resumen lab-espera">
+                    No se pudo bajar a {asomada.nombre}. Revisa tu conexión.{" "}
+                    <button type="button" className="mini" onClick={() => reintentar(asomada.especie)}>
+                      Reintentar
+                    </button>
+                  </p>
+                )}
               </>
             ) : (
               <p className="lab-resumen">Pasa el cursor sobre una pokébola o usa las flechas.</p>
@@ -573,14 +638,14 @@ export function Laboratorio({
                     type="button"
                     role="option"
                     aria-selected={marcadaEf === v.especie}
-                    aria-label={`${rotulo(v)}, número ${v.especie}, tipo ${v.tipoNombre}`}
+                    aria-label={`${rotulo(v)}, número ${v.especie}, tipo ${v.tipoNombre}${estadoDe(v.especie) === "lista" ? "" : ", por llegar"}`}
                     tabIndex={marcadaEf === v.especie ? 0 : -1}
-                    className="lab-celda"
+                    className={`lab-celda ${estadoDe(v.especie) === "lista" ? "" : "lab-celda-pendiente"}`}
                     onPointerEnter={() => setMarcada(v.especie)}
                     onFocus={() => setMarcada(v.especie)}
                     onClick={() => elegirOtra(v.especie)}
                   >
-                    <SpriteQuieto especie={v.especie} lado={44} />
+                    <SpriteQuieto especie={v.especie} lado={44} lista={estadoDe(v.especie) === "lista"} />
                     <span className="lab-celda-num" aria-hidden="true">
                       {numeroDex(v.especie)}
                     </span>
@@ -602,6 +667,10 @@ export function Laboratorio({
                   ref={confirmarRef}
                   type="button"
                   className="boton boton-si"
+                  // Sin sus hojas y su grito no hay ceremonia: queda atenuado pero enfocable (aria-disabled) y la
+                  // máquina tampoco avanza si llegara el clic.
+                  aria-disabled={descarga !== "lista" ? true : undefined}
+                  aria-describedby={estadoAsomada !== "lista" ? "lab-espera" : undefined}
                   onClick={() => enviar({ tipo: "confirmar" })}
                 >
                   Sí

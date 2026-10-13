@@ -24,7 +24,14 @@ export interface EstadoLab {
   filtro: string;
   /** Número de la Pokédex de quien se eligió ahí, desde que se pide confirmación hasta que se cancela; null si se eligió una de las cuatro. */
   otra: number | null;
+  /**
+   * Si quien se eligió en la Pokédex ya tiene sus hojas y su grito ("lista"), se están bajando ("bajando") o la
+   * descarga falló ("fallo"). Mientras no esté "lista" no se puede confirmar. Las cuatro de siempre están listas.
+   */
+  descarga: DescargaLab;
 }
+
+export type DescargaLab = "lista" | "bajando" | "fallo";
 
 export type Evento =
   | { tipo: "enfocar"; indice: number }
@@ -36,7 +43,11 @@ export type Evento =
   | { tipo: "cerrarPokedex" }
   | { tipo: "filtrar"; texto: string }
   /** Elige a alguien de la Pokédex de Kanto: el renderer solo manda las que main dijo que están disponibles. */
-  | { tipo: "escogerOtra"; especie: number }
+  | { tipo: "escogerOtra"; especie: number; lista?: boolean }
+  /** Main avisa de que una especie terminó de bajarse (`ok`) o de que no se pudo. Solo importa para la elegida. */
+  | { tipo: "llegada"; especie: number; ok: boolean }
+  /** La persona pide intentar otra vez la descarga que falló. */
+  | { tipo: "reintentar" }
   | { tipo: "confirmar" }
   | { tipo: "volver" }
   | { tipo: "escape" }
@@ -68,6 +79,7 @@ export const ESTADO_INICIAL: EstadoLab = {
   pokedex: false,
   filtro: "",
   otra: null,
+  descarga: "lista",
 };
 
 /** La escena del Pokémon recién salido de su pokébola sigue a la vista hasta que se va a la carpeta. */
@@ -125,6 +137,7 @@ const aElegir = (e: EstadoLab): EstadoLab => ({
   avisoSalir: false,
   nombre: null,
   modelo: null,
+  descarga: "lista",
 });
 
 /**
@@ -177,6 +190,7 @@ export function reducir(e: EstadoLab, ev: Evento, total: number): { estado: Esta
                   ...e,
                   paso: "confirmar",
                   otra: ev.especie,
+                  descarga: ev.lista === false ? "bajando" : "lista",
                   elegida: null,
                   enfocada: null,
                   avisoSalir: false,
@@ -196,8 +210,15 @@ export function reducir(e: EstadoLab, ev: Evento, total: number): { estado: Esta
       }
     case "confirmar":
       switch (ev.tipo) {
+        // Sin sus hojas y su grito la ceremonia no se puede hacer: el botón espera a que lleguen.
         case "confirmar":
-          return { estado: { ...e, paso: "ceremonia" } };
+          return e.descarga === "lista" ? { estado: { ...e, paso: "ceremonia" } } : quieto;
+        case "llegada":
+          return e.otra === ev.especie && e.descarga === "bajando"
+            ? { estado: { ...e, descarga: ev.ok ? "lista" : "fallo" } }
+            : quieto;
+        case "reintentar":
+          return e.descarga === "fallo" ? { estado: { ...e, descarga: "bajando" } } : quieto;
         case "volver":
         case "escape":
           return { estado: aElegir(e) };
@@ -267,4 +288,60 @@ export function bolaParaElFoco(
 ): number | null {
   if (paso !== "elegir" || enfocada === null) return null;
   return focoEn === "otro" ? null : enfocada;
+}
+
+/** Lo que main avisa de una especie que se bajó (`ok`) o falló. */
+export interface Llegada {
+  especie: number;
+  ok: boolean;
+}
+
+/** Lo que llega por IPC no se cree: solo una especie entera positiva y un booleano. */
+export function validarLlegada(dato: unknown): Llegada | null {
+  if (typeof dato !== "object" || dato === null || Array.isArray(dato)) return null;
+  const { especie, ok } = dato as Record<string, unknown>;
+  if (typeof especie !== "number" || !Number.isInteger(especie) || especie < 1 || typeof ok !== "boolean")
+    return null;
+  return { especie, ok };
+}
+
+/** Qué especies de la Pokédex ya tienen sus hojas y su grito, y cuáles fallaron al bajar (el renderer lo lleva al día). */
+export interface Llegadas {
+  listas: ReadonlySet<number>;
+  falladas: ReadonlySet<number>;
+}
+
+export const llegadasIniciales = (listas: readonly number[]): Llegadas => ({
+  listas: new Set(listas),
+  falladas: new Set(),
+});
+
+/** "lista" (se ve su sprite), "bajando" (por llegar) o "fallo" (se intentó y no se pudo). */
+export const estadoEspecie = (l: Llegadas, especie: number): DescargaLab =>
+  l.falladas.has(especie) ? "fallo" : l.listas.has(especie) ? "lista" : "bajando";
+
+/**
+ * Anota una llegada. Un fallo es autoritativo: main lo manda cuando una especie que se daba por lista ya no tiene sus
+ * archivos o no se pudo bajar, así que la saca de las listas (también si es una inicial). Sin cambios, devuelve el
+ * mismo objeto.
+ */
+export function aplicarLlegada(l: Llegadas, ll: Llegada): Llegadas {
+  if (ll.ok) {
+    if (l.listas.has(ll.especie)) return l;
+    const falladas = new Set(l.falladas);
+    falladas.delete(ll.especie);
+    return { listas: new Set(l.listas).add(ll.especie), falladas };
+  }
+  if (l.falladas.has(ll.especie) && !l.listas.has(ll.especie)) return l;
+  const listas = new Set(l.listas);
+  listas.delete(ll.especie);
+  return { listas, falladas: new Set(l.falladas).add(ll.especie) };
+}
+
+/** Al reintentar, la especie deja de estar fallida (vuelve a "bajando" hasta que main avise). */
+export function quitarFallo(l: Llegadas, especie: number): Llegadas {
+  if (!l.falladas.has(especie)) return l;
+  const falladas = new Set(l.falladas);
+  falladas.delete(especie);
+  return { listas: l.listas, falladas };
 }

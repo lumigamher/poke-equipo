@@ -1,4 +1,5 @@
 import type { InicialVista } from "@compartido/inicial";
+import type { Llegadas } from "@compartido/laboratorio";
 import type { DatosAnim, EstadoOido, NombresLab, VistaPokemon } from "@compartido/tipos";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCapturaMouse } from "./captura-mouse";
@@ -36,11 +37,14 @@ export function Escenario({
   /** El laboratorio de la primera vez, mientras está abierto: recibe el ratón y el teclado. */
   laboratorio: {
     iniciales: InicialVista[];
-    /** La Pokédex de Kanto del laboratorio: las que tienen sprites. */
+    /** La Pokédex de Kanto del laboratorio: las 151, estén o no bajadas. */
     otras: InicialVista[];
     nombres: NombresLab;
     volverN: number;
     preparando: boolean;
+    llegadas: Llegadas;
+    pedirEspecie(especie: number, eleccion: boolean): void;
+    reintentarEspecie(especie: number): void;
   } | null;
 }) {
   const [arrastrando, setArrastrando] = useState<Set<string>>(() => new Set());
@@ -108,6 +112,9 @@ export function Escenario({
             nombres={laboratorio.nombres}
             volverN={laboratorio.volverN}
             preparando={laboratorio.preparando}
+            llegadas={laboratorio.llegadas}
+            pedirEspecie={laboratorio.pedirEspecie}
+            reintentarEspecie={laboratorio.reintentarEspecie}
           />
         </LabErrorBoundary>
       )}

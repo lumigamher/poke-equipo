@@ -90,11 +90,24 @@ export function animsDe(especie: number): Promise<Record<string, DatosAnim>> {
   let p = animsPedidas.get(especie);
   if (!p) {
     p = window.poke.anims(especie);
-    // Si falla se vuelve a intentar la próxima vez (el que la pidió ya maneja su error).
-    p.catch(() => animsPedidas.delete(especie));
+    // Si falla se vuelve a intentar la próxima vez (el que la pidió ya maneja su error). Y "no hay animaciones"
+    // tampoco se recuerda: una especie que aún no estaba bajada llega más tarde y debe poder pedirse otra vez.
+    p.then(
+      (a) => {
+        if (Object.keys(a).length === 0 && animsPedidas.get(especie) === p) animsPedidas.delete(especie);
+      },
+      () => {
+        if (animsPedidas.get(especie) === p) animsPedidas.delete(especie);
+      },
+    );
     animsPedidas.set(especie, p);
   }
   return p;
+}
+
+/** Olvida lo recordado de una especie: al llegar sus archivos de fondo, la próxima petición los lee de verdad. */
+export function olvidarAnims(especie: number): void {
+  animsPedidas.delete(especie);
 }
 
 /** Pide todas las hojas de una especie apenas se conocen, para que ningún cambio de estado espere una carga. */
@@ -334,7 +347,16 @@ function vigilarCerca(el: Element, avisar: () => void): () => void {
  * Pokédex de Kanto, donde 151 animados a la vez serían un gasto sin sentido. Carga perezosa: no pide ni sus
  * animaciones ni su hoja hasta que entra en pantalla (o a 80 px de hacerlo). Si algo falla queda vacío.
  */
-export function SpriteQuieto({ especie, lado = 52 }: { especie: number; lado?: number }) {
+export function SpriteQuieto({
+  especie,
+  lado = 52,
+  lista = true,
+}: {
+  especie: number;
+  lado?: number;
+  /** Sus archivos ya están en disco; si no, no se pide nada (queda el recuadro) y al llegar se carga solo. */
+  lista?: boolean;
+}) {
   const caja = useRef<HTMLSpanElement>(null);
   const lienzo = useRef<HTMLCanvasElement>(null);
   const [cerca, setCerca] = useState(false);
@@ -347,7 +369,7 @@ export function SpriteQuieto({ especie, lado = 52 }: { especie: number; lado?: n
   }, [cerca]);
 
   useEffect(() => {
-    if (!cerca) return;
+    if (!cerca || !lista) return;
     let vivo = true;
     animsDe(especie).then(
       (a) => {
@@ -367,7 +389,7 @@ export function SpriteQuieto({ especie, lado = 52 }: { especie: number; lado?: n
     return () => {
       vivo = false;
     };
-  }, [cerca, especie]);
+  }, [cerca, especie, lista]);
 
   useEffect(() => {
     const el = lienzo.current;
@@ -391,7 +413,7 @@ export function SpriteQuieto({ especie, lado = 52 }: { especie: number; lado?: n
   const escala = mayor > lado ? lado / mayor : Math.max(1, Math.min(2, Math.floor(lado / mayor)));
   return (
     <span ref={caja} className="sprite-quieto" style={{ width: lado, height: lado }} aria-hidden="true">
-      {listo && (
+      {listo && lista && (
         <canvas
           ref={lienzo}
           className="sprite"

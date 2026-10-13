@@ -8,12 +8,21 @@ export type RespuestaLab =
   | { tipo: "salir" };
 
 /** Lo que main le pide al laboratorio: abrirse, volver a la elección (se canceló la carpeta) o cerrarse. */
-export type OrdenLab = { tipo: "abrir" } | { tipo: "volver" } | { tipo: "cerrar" };
+export type OrdenLab =
+  | { tipo: "abrir" }
+  /** `fallo`: la especie elegida no tenía sus assets completos ni se pudieron bajar; el laboratorio lo avisa. */
+  | { tipo: "volver"; fallo?: number }
+  | { tipo: "cerrar" };
 
 export interface DepsPrimeraVez {
   /** Los Pokémon que se ofrecen; solo estos se aceptan (lo que llega por IPC no se cree). */
   iniciales: { especie: number; nombre: string }[];
   mostrar(orden: OrdenLab): void;
+  /**
+   * Que la especie tenga sus hojas y su grito completos en disco; si faltan, intenta bajarlas (con prioridad) y
+   * resuelve false si no pudo. Es la última comprobación antes de crear: nunca nace un Pokémon con assets incompletos.
+   */
+  asegurar(especie: number): Promise<boolean>;
   /** La próxima cosa que diga el laboratorio. */
   esperar(): Promise<RespuestaLab>;
   elegirCarpeta(titulo: string): Promise<string | null>;
@@ -50,6 +59,10 @@ export async function primeraVez(deps: DepsPrimeraVez): Promise<DatosNuevos | nu
         deps.mostrar({ tipo: "volver" });
         continue;
       }
+      if (!(await deps.asegurar(inicial.especie))) {
+        deps.mostrar({ tipo: "volver", fallo: inicial.especie });
+        continue;
+      }
       const { voz, velocidad } = deps.datosDe(inicial.especie);
       // Una elección explícita (de la lista) se guarda siempre; sin ella (nulo) manda el tipo.
       const modelo = modeloValido(r.modelo);
@@ -75,4 +88,18 @@ export function validarRespuestaLab(dato: unknown): RespuestaLab | null {
       ...(modeloValido(modelo) !== null ? { modelo: modelo as string } : {}),
     };
   return null;
+}
+
+/** Lo que el renderer pide bajar desde el laboratorio: solo una especie entera que main ofrece (nunca rutas ni URLs). */
+export interface PedidoEspecie {
+  especie: number;
+  /** Quien se eligió (no solo se marcó): pasa al frente de la cola. */
+  eleccion: boolean;
+}
+
+export function validarPedidoEspecie(dato: unknown, ofrecidas: readonly number[]): PedidoEspecie | null {
+  if (typeof dato !== "object" || dato === null || Array.isArray(dato)) return null;
+  const { especie, eleccion } = dato as Record<string, unknown>;
+  if (typeof especie !== "number" || !Number.isInteger(especie) || !ofrecidas.includes(especie)) return null;
+  return { especie, eleccion: eleccion === true };
 }

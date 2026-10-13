@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   activaCeremonia,
+  aplicarLlegada,
   bolaParaElFoco,
   type Efecto,
   ESTADO_INICIAL,
   type EstadoLab,
   type Evento,
+  estadoEspecie,
+  llegadasIniciales,
+  quitarFallo,
   reducir,
+  validarLlegada,
 } from "./laboratorio";
 
 const TOTAL = 4;
@@ -35,6 +40,7 @@ describe("laboratorio: máquina de pasos", () => {
       pokedex: false,
       filtro: "",
       otra: null,
+      descarga: "lista",
     });
   });
 
@@ -243,6 +249,7 @@ describe("laboratorio: máquina de pasos", () => {
       pokedex: false,
       filtro: "",
       otra: null,
+      descarga: "lista",
     });
     const otra = correr(
       [
@@ -441,5 +448,129 @@ describe("bolaParaElFoco: las flechas llevan el foco a la bola nueva", () => {
       { tipo: "mover", delta: 1 },
     ]);
     expect(bolaParaElFoco(r.estado.paso, r.estado.enfocada, "bola")).toBe(2);
+  });
+});
+
+describe("laboratorio: especies de Kanto que todavía no llegaron", () => {
+  const enPokedex = (...eventos: Evento[]) => correr([{ tipo: "abrirPokedex" }, ...eventos]);
+
+  it("el estado inicial no espera descarga", () => {
+    expect(ESTADO_INICIAL.descarga).toBe("lista");
+  });
+
+  it("elegir a alguien ya bajado (o sin decir nada) deja confirmar de una vez", () => {
+    for (const lista of [true, undefined]) {
+      const r = enPokedex({ tipo: "escogerOtra", especie: 150, lista }, { tipo: "confirmar" });
+      expect(r.estado, String(lista)).toMatchObject({ paso: "ceremonia", otra: 150, descarga: "lista" });
+    }
+  });
+
+  it("elegir a alguien que aún no está pone la descarga en curso y NO deja pasar a la ceremonia", () => {
+    const e = enPokedex({ tipo: "escogerOtra", especie: 150, lista: false });
+    expect(e.estado).toMatchObject({ paso: "confirmar", otra: 150, descarga: "bajando" });
+    const r = correr([{ tipo: "confirmar" }], e.estado);
+    expect(r.estado).toEqual(e.estado);
+    expect(r.efectos).toEqual([]);
+  });
+
+  it("cuando llega la elegida se puede confirmar", () => {
+    const e = enPokedex(
+      { tipo: "escogerOtra", especie: 150, lista: false },
+      { tipo: "llegada", especie: 150, ok: true },
+    );
+    expect(e.estado.descarga).toBe("lista");
+    expect(correr([{ tipo: "confirmar" }], e.estado).estado.paso).toBe("ceremonia");
+  });
+
+  it("si la descarga falla queda en fallo, sigue sin dejar pasar, y Reintentar la vuelve a poner en curso", () => {
+    const f = enPokedex(
+      { tipo: "escogerOtra", especie: 150, lista: false },
+      { tipo: "llegada", especie: 150, ok: false },
+    );
+    expect(f.estado.descarga).toBe("fallo");
+    expect(correr([{ tipo: "confirmar" }], f.estado).estado.paso).toBe("confirmar");
+    const r = correr([{ tipo: "reintentar" }], f.estado);
+    expect(r.estado.descarga).toBe("bajando");
+    expect(correr([{ tipo: "llegada", especie: 150, ok: true }], r.estado).estado.descarga).toBe("lista");
+  });
+
+  it("lo que llega de otra especie, o fuera de tiempo, no toca a la elegida", () => {
+    const e = enPokedex({ tipo: "escogerOtra", especie: 150, lista: false });
+    expect(correr([{ tipo: "llegada", especie: 149, ok: true }], e.estado).estado).toEqual(e.estado);
+    expect(correr([{ tipo: "llegada", especie: 149, ok: false }], e.estado).estado).toEqual(e.estado);
+    // Una llegada vieja con fallo no tumba a una que ya está lista.
+    const lista = enPokedex({ tipo: "escogerOtra", especie: 150, lista: true });
+    expect(correr([{ tipo: "llegada", especie: 150, ok: false }], lista.estado).estado).toEqual(lista.estado);
+    // Reintentar sin fallo no hace nada.
+    expect(correr([{ tipo: "reintentar" }], e.estado).estado).toEqual(e.estado);
+  });
+
+  it("Volver desde una pendiente regresa a la Pokédex y olvida la descarga", () => {
+    const e = enPokedex({ tipo: "escogerOtra", especie: 150, lista: false }, { tipo: "volver" });
+    expect(e.estado).toMatchObject({ paso: "elegir", pokedex: true, otra: null, descarga: "lista" });
+  });
+
+  it("las llegadas durante la elección o la ceremonia no cambian nada", () => {
+    expect(correr([{ tipo: "llegada", especie: 150, ok: true }]).estado).toEqual(ESTADO_INICIAL);
+    const c = correr([{ tipo: "escoger", indice: 1 }, { tipo: "confirmar" }]).estado;
+    expect(correr([{ tipo: "llegada", especie: 4, ok: false }], c).estado).toEqual(c);
+  });
+
+  it("validarLlegada solo acepta una especie entera y el estado conocido", () => {
+    expect(validarLlegada({ especie: 25, ok: true })).toEqual({ especie: 25, ok: true });
+    expect(validarLlegada({ especie: 25, ok: false })).toEqual({ especie: 25, ok: false });
+    for (const malo of [
+      null,
+      3,
+      "x",
+      [],
+      {},
+      { especie: "25", ok: true },
+      { especie: 2.5, ok: true },
+      { especie: 0, ok: true },
+      { especie: 25 },
+      { especie: 25, ok: "si" },
+    ])
+      expect(validarLlegada(malo), JSON.stringify(malo)).toBeNull();
+  });
+});
+
+describe("laboratorio: qué especies ya llegaron", () => {
+  it("al abrir, las listas son las que main dice y ninguna falló", () => {
+    const l = llegadasIniciales([1, 4, 25]);
+    expect(estadoEspecie(l, 25)).toBe("lista");
+    expect(estadoEspecie(l, 150)).toBe("bajando");
+  });
+
+  it("una llegada marca la especie lista (sin tocar las demás); un fallo la marca fallida", () => {
+    const l0 = llegadasIniciales([1]);
+    const l1 = aplicarLlegada(l0, { especie: 150, ok: true });
+    expect(estadoEspecie(l1, 150)).toBe("lista");
+    expect(estadoEspecie(l1, 149)).toBe("bajando");
+    const l2 = aplicarLlegada(l1, { especie: 149, ok: false });
+    expect(estadoEspecie(l2, 149)).toBe("fallo");
+    // Un fallo es autoritativo (main lo manda cuando faltan archivos): saca a una lista, también si es una inicial.
+    expect(estadoEspecie(aplicarLlegada(l2, { especie: 150, ok: false }), 150)).toBe("fallo");
+    expect(estadoEspecie(aplicarLlegada(l2, { especie: 1, ok: false }), 1)).toBe("fallo");
+    const inicialFallida = aplicarLlegada(l2, { especie: 1, ok: false });
+    expect(estadoEspecie(aplicarLlegada(inicialFallida, { especie: 1, ok: true }), 1)).toBe("lista");
+  });
+
+  it("si la fallida llega después (reintento), deja de estar fallida", () => {
+    const f = aplicarLlegada(llegadasIniciales([]), { especie: 7, ok: false });
+    expect(estadoEspecie(aplicarLlegada(f, { especie: 7, ok: true }), 7)).toBe("lista");
+  });
+
+  it("reintentar quita el fallo y vuelve a 'bajando'", () => {
+    const f = aplicarLlegada(llegadasIniciales([]), { especie: 7, ok: false });
+    expect(estadoEspecie(quitarFallo(f, 7), 7)).toBe("bajando");
+  });
+
+  it("si nada cambia devuelve el mismo objeto (no re-dibuja 151 veces sin motivo)", () => {
+    const l = llegadasIniciales([1]);
+    expect(aplicarLlegada(l, { especie: 1, ok: true })).toBe(l);
+    const f = aplicarLlegada(l, { especie: 9, ok: false });
+    expect(aplicarLlegada(f, { especie: 9, ok: false })).toBe(f);
+    expect(quitarFallo(l, 5)).toBe(l);
   });
 });

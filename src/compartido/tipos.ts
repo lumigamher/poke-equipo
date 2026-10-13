@@ -212,6 +212,10 @@ export const CANALES = {
   labListo: "poke:lab-listo",
   /** Renderer → main: el laboratorio falló al dibujarse; main suelta la ventana. */
   labFallo: "poke:lab-fallo",
+  /** Renderer → main: lleva `{ especie, eleccion? }` de una especie de la Pokédex del laboratorio que aún no está bajada; main la baja con prioridad. */
+  pedirEspecie: "poke:pedir-especie",
+  /** Main → renderer: lleva una `Llegada` (`{ especie, ok }`): esa especie terminó de bajarse o no se pudo. */
+  especieLab: "poke:especie-lab",
   /** Main → renderer: lleva `{ pokemonId, texto }`, lo que se escribe de entrada en el campo de esa burbuja. */
   prellenar: "poke:prellenar",
   /** Main → renderer: terminó una carga; que vuelva a enviar su valor actual de captura del ratón. */
@@ -241,8 +245,10 @@ export type OrdenLaboratorio =
   | {
       tipo: "abrir";
       iniciales: InicialVista[];
-      /** Las de la Pokédex de Kanto (el huevo de pascua) que main tiene bajadas; vacía = sin esa opción. */
+      /** Las 151 de la Pokédex de Kanto (el huevo de pascua), estén o no bajadas; vacía = sin esa opción. */
       otras: InicialVista[];
+      /** Las especies (de las cuatro y de `otras`) que ya tienen sus hojas y su grito en disco al abrir. */
+      listas: number[];
       nombres: NombresLab;
     }
   | { tipo: "volver" }
@@ -309,6 +315,10 @@ export interface PuentePoke {
   alLaboratorio(fn: (orden: OrdenLaboratorio) => void): void;
   pedirLaboratorio(): void;
   inicial(respuesta: RespuestaLaboratorio): void;
+  /** Pide que main baje ya esta especie de la Pokédex (si falta). Main solo acepta las que ofrece. */
+  pedirEspecie(especie: number, eleccion: boolean): void;
+  /** Main avisa de que una especie terminó de bajarse o no se pudo (llega al laboratorio abierto, sin recargar). */
+  alEspecieLab(fn: (llegada: unknown) => void): void;
   /** El laboratorio ya se ve (main le da entonces el ratón y el teclado). */
   labListo(): void;
   /** El laboratorio falló al dibujarse: main suelta la ventana. */

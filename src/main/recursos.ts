@@ -46,3 +46,10 @@ export function leerAnims(especie: number): Record<string, DatosAnim> {
   if (!existsSync(archivo)) return {};
   return JSON.parse(readFileSync(archivo, "utf8")) as Record<string, DatosAnim>;
 }
+
+/** Que la especie tenga en disco lo mismo que exige la descarga para darla por hecha: sus animaciones y su grito. */
+export function especieEnDisco(especie: number): boolean {
+  if (!Number.isInteger(especie) || especie <= 0) return false;
+  const dir = join(RUTAS.assets, carpetaEspecie(especie));
+  return existsSync(join(dir, "anims.json")) && existsSync(join(dir, "grito.ogg"));
+}

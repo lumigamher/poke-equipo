@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { type DepsPrimeraVez, primeraVez, type RespuestaLab, validarRespuestaLab } from "./primera-vez";
+import {
+  type DepsPrimeraVez,
+  primeraVez,
+  type RespuestaLab,
+  validarPedidoEspecie,
+  validarRespuestaLab,
+} from "./primera-vez";
 
 const INICIALES = [1, 4, 7, 25];
 const NOMBRES: Record<number, string> = { 1: "Bulbasaur", 4: "Charmander", 7: "Squirtle", 25: "Pikachu" };
@@ -9,7 +15,9 @@ function montar(respuestas: RespuestaLab[], carpetas: (string | null)[]) {
   const log: string[] = [];
   const deps: DepsPrimeraVez = {
     iniciales: INICIALES.map((especie) => ({ especie, nombre: NOMBRES[especie] })),
-    mostrar: (o) => log.push(`mostrar:${o.tipo}`),
+    mostrar: (o) =>
+      log.push(o.tipo === "volver" && o.fallo ? `mostrar:volver:${o.fallo}` : `mostrar:${o.tipo}`),
+    asegurar: async () => true,
     esperar: async () => {
       const r = respuestas.shift();
       if (!r) throw new Error("el laboratorio pidió más respuestas de las previstas");
@@ -135,6 +143,38 @@ describe("primera vez: laboratorio → carpeta → crear", () => {
     expect(mal.log.some((l) => l.startsWith("carpeta:¿En qué proyecto va a trabajar Mew"))).toBe(false);
   });
 
+  it("la elegida debe tener sus assets completos al crearla: si no están, se intenta bajarla (asegurar) antes de crear", async () => {
+    const m = montar([{ tipo: "elegida", especie: 4 }], ["/p"]);
+    m.deps.asegurar = async (e) => {
+      m.log.push(`asegurar:${e}`);
+      return true;
+    };
+    const r = await primeraVez(m.deps);
+    expect(r?.especie).toBe(4);
+    // Se comprueba tras la carpeta y justo antes de devolver los datos.
+    expect(m.log.indexOf("asegurar:4")).toBeGreaterThan(m.log.findIndex((l) => l.startsWith("carpeta:")));
+    expect(m.log.indexOf("asegurar:4")).toBeLessThan(m.log.indexOf("mostrar:cerrar"));
+  });
+
+  it("si no se puede asegurar (sin red, 404), no se crea: vuelve al laboratorio avisando de cuál fue y se puede elegir otra", async () => {
+    const m = montar(
+      [
+        { tipo: "elegida", especie: 150 },
+        { tipo: "elegida", especie: 25 },
+      ],
+      ["/p", "/q"],
+    );
+    m.deps.iniciales = [...m.deps.iniciales, { especie: 150, nombre: "Mewtwo" }];
+    m.deps.asegurar = async (e) => {
+      m.log.push(`asegurar:${e}`);
+      return e !== 150;
+    };
+    const r = await primeraVez(m.deps);
+    expect(r).toMatchObject({ especie: 25, carpeta: "/q" });
+    expect(m.log).toContain("mostrar:volver:150");
+    expect(m.log.filter((l) => l.startsWith("asegurar:"))).toEqual(["asegurar:150", "asegurar:25"]);
+  });
+
   it("puede cancelar la carpeta varias veces seguidas sin cerrar la app", async () => {
     const m = montar(
       [
@@ -220,5 +260,37 @@ describe("validarRespuestaLab", () => {
       { tipo: "aprobar" },
     ])
       expect(validarRespuestaLab(malo)).toBeNull();
+  });
+});
+
+describe("validarPedidoEspecie", () => {
+  const ofrecidas = [1, 4, 7, 25, 150];
+  it("acepta una especie entera de las ofrecidas, marcada o elegida", () => {
+    expect(validarPedidoEspecie({ especie: 150 }, ofrecidas)).toEqual({ especie: 150, eleccion: false });
+    expect(validarPedidoEspecie({ especie: 1, eleccion: true }, ofrecidas)).toEqual({
+      especie: 1,
+      eleccion: true,
+    });
+    expect(validarPedidoEspecie({ especie: 1, eleccion: "si" }, ofrecidas)?.eleccion).toBe(false);
+  });
+  it("rechaza lo que no es una especie ofrecida (nada de rutas ni URLs, ni números fuera del catálogo)", () => {
+    for (const malo of [
+      null,
+      undefined,
+      25,
+      "25",
+      "../25",
+      {},
+      [],
+      { especie: "25" },
+      { especie: "poke://assets/0025" },
+      { especie: 2.5 },
+      { especie: -1 },
+      { especie: 0 },
+      { especie: 9999 },
+      { especie: Number.NaN },
+      { especie: 151 },
+    ])
+      expect(validarPedidoEspecie(malo, ofrecidas), String(malo)).toBeNull();
   });
 });

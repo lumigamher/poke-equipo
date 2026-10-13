@@ -420,6 +420,10 @@ body {
   cursor: not-allowed;
   background: #ddd6c2;
 }
+.boton[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .boton-si:disabled {
   background: #6b645a;
 }
@@ -1944,6 +1948,18 @@ body {
   font-weight: 700;
   line-height: 1.2;
   color: rgba(38, 34, 28, 0.7);
+}
+/* Una especie por llegar: el mismo recuadro del sprite, tenue y de trazo discontinuo, y su número más visible. */
+.lab-celda-pendiente .sprite-quieto {
+  box-sizing: border-box;
+  border: 1px dashed rgba(38, 34, 28, 0.3);
+  border-radius: 4px;
+}
+.lab-celda-pendiente .lab-celda-num {
+  color: var(--tinta);
+}
+.lab-espera .mini {
+  margin-left: 4px;
 }
 .lab-nota {
   margin: 0;

@@ -167,6 +167,8 @@ describe("canales previos al laboratorio", () => {
       alInicial: vi.fn(),
       alLabListo: vi.fn(),
       alLabFallo: vi.fn(),
+      alPedirEspecie: vi.fn(),
+      esRemitente: (e: unknown) => (e as { ventana?: string }).ventana === "propia",
     };
     const hechos = registrarPrevios(ipc, d);
     expect([...hechos].sort()).toEqual([...CANALES_PREVIOS].sort());
@@ -176,6 +178,37 @@ describe("canales previos al laboratorio", () => {
     oyentes.get(CANALES.microfonoEstado)?.({}, "no");
     oyentes.get(CANALES.microfonoEstado)?.({}, false);
     expect(d.alMicrofono.mock.calls).toEqual([[false]]);
+  });
+
+  it("pedir una especie: solo del remitente propio; la carga la valida main (aquí llega tal cual)", () => {
+    const oyentes = new Map<string, (e: unknown, d: unknown) => unknown>();
+    const ipc = {
+      on: (c: string, f: (e: unknown, d: unknown) => void) => oyentes.set(c, f),
+      handle: (c: string, f: (e: unknown, d: unknown) => unknown) => oyentes.set(c, f),
+    };
+    const alPedirEspecie = vi.fn();
+    registrarPrevios(ipc, {
+      entrada: {
+        ignorarMouse: vi.fn(),
+        enfocar: vi.fn(),
+        poner: vi.fn(),
+        alCargar: vi.fn(),
+        alEmpezarCarga: vi.fn(),
+      },
+      anims: vi.fn(),
+      alMicrofono: vi.fn(),
+      alPedirLaboratorio: vi.fn(),
+      alInicial: vi.fn(),
+      alLabListo: vi.fn(),
+      alLabFallo: vi.fn(),
+      alPedirEspecie,
+      esRemitente: (e) => (e as { ventana?: string }).ventana === "propia",
+    });
+    const pedir = oyentes.get(CANALES.pedirEspecie);
+    pedir?.({ ventana: "ajena" }, { especie: 25 });
+    expect(alPedirEspecie).not.toHaveBeenCalled();
+    pedir?.({ ventana: "propia" }, { especie: 25 });
+    expect(alPedirEspecie.mock.calls).toEqual([[{ especie: 25 }]]);
   });
 
   it("index.ts los registra antes de esperar el laboratorio, y ninguno otra vez después", () => {

@@ -13,6 +13,7 @@ export const CANALES_PREVIOS = [
   CANALES.inicial,
   CANALES.labListo,
   CANALES.labFallo,
+  CANALES.pedirEspecie,
 ] as const;
 
 export interface VentanaEntrada {
@@ -220,6 +221,10 @@ export interface DepsPrevios {
   alLabListo(): void;
   /** El laboratorio falló al dibujarse (error boundary). */
   alLabFallo(): void;
+  /** El laboratorio pide bajar una especie con prioridad (main valida la carga contra lo que ofrece). */
+  alPedirEspecie(dato: unknown): void;
+  /** Que el mensaje venga del marco principal de la ventana propia de la app (no de otra página ni de un subframe). */
+  esRemitente(evento: unknown): boolean;
 }
 
 /** Registra los canales previos. Devuelve cuáles registró, para comprobar que no falta ninguno. */
@@ -244,5 +249,9 @@ export function registrarPrevios(ipc: Ipc, d: DepsPrevios): string[] {
   on(CANALES.inicial, (dato) => d.alInicial(dato));
   on(CANALES.labListo, () => d.alLabListo());
   on(CANALES.labFallo, () => d.alLabFallo());
+  hechos.push(CANALES.pedirEspecie);
+  ipc.on(CANALES.pedirEspecie, (e, dato) => {
+    if (d.esRemitente(e)) d.alPedirEspecie(dato);
+  });
   return hechos;
 }
