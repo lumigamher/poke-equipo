@@ -43,3 +43,8 @@ export function tomarScroll(pokemonId: string, tarea: number): ScrollGuardado | 
 export function altoDisponible(bordeInferior: number, margen = 12): number {
   return Math.max(160, Math.floor(bordeInferior - margen));
 }
+
+/** Alto máximo de una burbuja que abre hacia abajo: lo que queda bajo su borde superior, sin salirse por abajo. */
+export function altoDisponibleAbajo(bordeSuperior: number, altoVentana: number, margen = 12): number {
+  return Math.max(160, Math.floor(altoVentana - bordeSuperior - margen));
+}

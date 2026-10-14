@@ -5,10 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useCapturaMouse } from "./captura-mouse";
 import { posicionInicial } from "./disposicion";
 import { Entorno } from "./Entorno";
+import { Incubadora } from "./Incubadora";
 import { LabErrorBoundary } from "./LabErrorBoundary";
 import { Laboratorio } from "./Laboratorio";
 import { PokemonEnEscena } from "./PokemonEnEscena";
 import { Recorrido } from "./Recorrido";
+import { xRanura } from "./ranuras-incubadora";
 
 /** Mientras las anims de una especie no llegan. Siempre el mismo objeto: los hooks que dependen de él no se reinician. */
 const SIN_ANIMS: Record<string, DatosAnim> = Object.freeze({}) as Record<string, DatosAnim>;
@@ -69,10 +71,14 @@ export function Escenario({
   // el primero; con seis en pantalla no parpadean todos con cada ruido.
   const [oido, setOido] = useState<EstadoOido>("atento");
   useEffect(() => window.poke.alOido(setOido), []);
+  // La incubadora: los escondidos se ven como pokébola mini; solo están en escena los demás y los que asoman.
+  const enIncubadora = vistas.filter((v) => v.escondido);
+  const enEscena = vistas.filter((v) => !v.escondido || v.asoma);
+  // (El oído lo muestra alguien a la vista: nunca uno que está dentro de su pokébola.)
   const muestraOido = (
-    vistas.find((v) => v.abierta) ??
-    vistas.find((v) => v.estado === "escuchando") ??
-    vistas.find((v) => v.estado !== "guardandose")
+    enEscena.find((v) => v.abierta) ??
+    enEscena.find((v) => v.estado === "escuchando") ??
+    enEscena.find((v) => v.estado !== "guardandose")
   )?.id;
   // Texto grande: preferencia de la persona, igual para todos.
   const textoGrande = vistas.some((v) => v.textoGrande);
@@ -80,12 +86,19 @@ export function Escenario({
     document.documentElement.classList.toggle("texto-grande", textoGrande);
   }, [textoGrande]);
 
-  // Al irse, se olvida dónde estaba: si vuelve, vuelve a buscar sitio.
+  // Al irse (o al esconderse), se olvida dónde estaba: si vuelve, vuelve a buscar sitio.
   useEffect(() => {
-    const presentes = new Set(vistas.map((v) => v.id));
+    const presentes = new Set(vistas.filter((v) => !v.escondido || v.asoma).map((v) => v.id));
     for (const mapa of [iniciales.current, posiciones.current])
       for (const id of mapa.keys()) if (!presentes.has(id)) mapa.delete(id);
   }, [vistas]);
+
+  /** Dónde nace: junto a su pokébola si asoma; donde la persona lo dejó; o lejos de los que ya están. */
+  const lugarInicialDe = (vista: VistaPokemon): { x: number; alto: number } => {
+    if (vista.escondido) return { x: xRanura(enIncubadora.indexOf(vista), window.innerWidth), alto: 0 };
+    if (vista.lugar) return vista.lugar;
+    return { x: xInicialDe(vista.id), alto: 0 };
+  };
 
   /** La x con la que nace: se calcula una sola vez, lejos de los que ya están (en su x actual). */
   const xInicialDe = (id: string): number => {
@@ -119,22 +132,28 @@ export function Escenario({
         </LabErrorBoundary>
       )}
       {vistas.some((v) => v.recorrido) && <Recorrido vistas={vistas} oido={oido} />}
-      {vistas.map((vista) => (
-        <PokemonEnEscena
-          key={vista.id}
-          vista={vista}
-          anims={animsPorEspecie[vista.especie] ?? SIN_ANIMS}
-          animsPorEspecie={animsPorEspecie}
-          xDe={xDe}
-          xInicial={xInicialDe(vista.id)}
-          abierta={vista.abierta === true}
-          oido={vista.id === muestraOido ? oido : null}
-          raizEncima={raizEncima}
-          onArrastre={onArrastre}
-          onElegir={onElegir}
-          onPosicion={onPosicion}
-        />
-      ))}
+      {enEscena.map((vista) => {
+        const inicio = lugarInicialDe(vista);
+        return (
+          <PokemonEnEscena
+            key={vista.id}
+            vista={vista}
+            anims={animsPorEspecie[vista.especie] ?? SIN_ANIMS}
+            animsPorEspecie={animsPorEspecie}
+            xDe={xDe}
+            xInicial={inicio.x}
+            altoInicial={inicio.alto}
+            asomado={vista.escondido === true}
+            abierta={vista.abierta === true}
+            oido={vista.id === muestraOido ? oido : null}
+            raizEncima={raizEncima}
+            onArrastre={onArrastre}
+            onElegir={onElegir}
+            onPosicion={onPosicion}
+          />
+        );
+      })}
+      <Incubadora vistas={enIncubadora} />
     </>
   );
 }

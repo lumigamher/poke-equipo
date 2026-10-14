@@ -132,6 +132,14 @@ export interface VistaPokemon {
    * el renderer solo la lee. Sin marcar (undefined) cuenta como cerrada: la voz no responde su permiso.
    */
   abierta?: boolean;
+  /** Dónde lo dejó la persona la última vez que lo soltó: px desde la izquierda y px sobre el suelo. Lo marca main. */
+  lugar?: { x: number; alto: number };
+  /** Está en la incubadora: sigue trabajando, pero se ve como una pokébola mini. Lo marca main. */
+  escondido?: boolean;
+  /** Escondido, pero te necesita (permiso, error, te escucha, algo sin leer): asoma de su pokébola. Lo marca main. */
+  asoma?: boolean;
+  /** Tamaño que la persona le dio a la burbuja, el mismo para todos. Lo marca main. */
+  tamBurbuja?: { ancho: number; alto: number };
 }
 
 /** Un Pokémon tal como se guarda en la base. */
@@ -228,6 +236,12 @@ export const CANALES = {
   pedirPreparacion: "poke:pedir-preparacion",
   /** Renderer → main: lleva una `AccionPreparacion` ("empezar", "cancelar" o "salir"). */
   accionPreparacion: "poke:accion-preparacion",
+  /** Renderer → main: lleva `{ pokemonId, x, alto }`, dónde la persona soltó a ese Pokémon. */
+  lugar: "poke:lugar",
+  /** Renderer → main: lleva `{ pokemonId }`; sacarlo de la incubadora. */
+  sacar: "poke:sacar",
+  /** Renderer → main: lleva `{ ancho, alto }`, el tamaño que la persona le dio a la burbuja. */
+  tamBurbuja: "poke:tam-burbuja",
 } as const;
 
 /** Lo que el laboratorio necesita para validar el nombre mientras se escribe (main lo vuelve a comprobar al recibirlo). */
@@ -327,6 +341,12 @@ export interface PuentePoke {
   elegir(pokemonId: string): void;
   /** Salta el alta de voz (el Pokémon aprendiendo cómo suena su nombre). */
   saltarAlta(pokemonId: string): void;
+  /** Dónde la persona soltó a ese Pokémon (px desde la izquierda y px sobre el suelo); main lo recuerda. */
+  lugar(pokemonId: string, x: number, alto: number): void;
+  /** Lo saca de la incubadora. */
+  sacar(pokemonId: string): void;
+  /** El tamaño que la persona le dio a la burbuja; main lo recuerda para todos. */
+  tamBurbuja(ancho: number, alto: number): void;
   /** Pantalla "Preparando a tu equipo": escucha los estados, pide el vigente y manda lo que la persona decide. */
   alPreparacion(fn: (estado: EstadoPreparacion) => void): void;
   pedirPreparacion(): void;

@@ -1,7 +1,7 @@
 import { esNoche, PASO_DE_NOCHE } from "@compartido/dia-noche";
 import { debeEntrar, ENTRADA_MS } from "@compartido/entrada";
 import type { DatosAnim, Estado, EstadoOido, VistaPokemon } from "@compartido/tipos";
-import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Ayudante, ESPACIO_AYUDANTE, ladoDeAyudantes } from "./Ayudante";
 import { BarraPS } from "./BarraPS";
 import { Burbuja } from "./Burbuja";
@@ -9,6 +9,7 @@ import { BurbujaChip } from "./BurbujaChip";
 import { debeMostrarse, posicionBurbuja } from "./burbuja-logica";
 import { REDUCIDO, useReducido } from "./ceremonia-hooks";
 import { MARGEN } from "./disposicion";
+import { ALTO_RESERVADO, ladoBurbuja, limitarLugar, soltar } from "./lugar";
 import { Pokebola } from "./Pokebola";
 import { Progreso } from "./Progreso";
 import {
@@ -25,7 +26,7 @@ import {
   animColgado,
   avanzar,
   elegirSinRepetir,
-  POSES,
+  poseDe,
   REACCIONES,
   TRAVESURAS,
 } from "./sprite/animaciones";
@@ -33,9 +34,20 @@ import { Objeto } from "./sprite/Objeto";
 import { Poder, VUELO_MS } from "./sprite/Poder";
 import { golpeNumero, planGolpe, primerGolpe, tipoDe } from "./sprite/poderes";
 import { ESCALA, Sprite } from "./sprite/Sprite";
+import {
+  ANCHO_MAX,
+  ANCHO_MIN,
+  limitarTamano,
+  TAMANO_INICIAL,
+  type Tamano,
+  tamanoTrasArrastre,
+} from "./tamano-burbuja";
 
-const ANCHO_BURBUJA = 320;
 const MARGEN_BURBUJA = 8;
+/** Lo mínimo que debe caber arriba para abrir la burbuja hacia arriba; si no, se abre hacia donde haya más espacio. */
+const MIN_BURBUJA = 260;
+/** Cuánto cambia el tamaño de la burbuja con cada flecha del teclado sobre el agarre. */
+const PASO_TECLADO = 24;
 const RADIO_COLA = 14;
 
 /**
@@ -261,6 +273,8 @@ export function PokemonEnEscena({
   animsPorEspecie,
   xDe,
   xInicial,
+  altoInicial = 0,
+  asomado = false,
   abierta,
   oido = null,
   raizEncima,
@@ -276,6 +290,10 @@ export function PokemonEnEscena({
   xDe?: (id: string) => number | undefined;
   /** Dónde empieza (px). Solo cuenta al montarse. */
   xInicial: number;
+  /** A qué altura sobre el suelo empieza (px; 0 = en el suelo). Solo cuenta al montarse. */
+  altoInicial?: number;
+  /** Está en la incubadora y asoma porque te necesita: se queda junto a su pokébola, sin pasear. */
+  asomado?: boolean;
   /**
    * Si su burbuja es LA abierta (`vista.abierta`, marcada por main). Abierta: se dibuja entera (con el permiso, si lo
    * hay). Cerrada: como mucho un chip; el bloque del permiso nunca se dibuja en un chip.
@@ -298,7 +316,19 @@ export function PokemonEnEscena({
   const [arrastrando, setArrastrando] = useState(false);
   /** En el aire: se está arrastrando de verdad (no es un clic). */
   const [alzado, setAlzado] = useState(false);
-  const arrastre = useRef<{ inicio: number; desfase: number; movido: boolean } | null>(null);
+  const arrastre = useRef<{
+    inicio: number;
+    inicioY: number;
+    desfase: number;
+    altoInicio: number;
+    movido: boolean;
+  } | null>(null);
+  /** Px sobre el suelo: 0 = en el suelo (pasea); más = posado donde lo dejaron (reposa). */
+  const [alto, setAlto] = useState(altoInicial);
+  // Tamaño de la burbuja: el que viene de main, o el que se está ajustando ahora con el agarre.
+  const [tamLocal, setTamLocal] = useState<Tamano | null>(null);
+  const ajuste = useRef<{ x: number; y: number; inicio: Tamano } | null>(null);
+  const [ajustando, setAjustando] = useState(false);
 
   // La abierta se dibuja aunque no tenga nada nuevo (la persona la eligió: su última respuesta o el campo para escribirle);
   // cerrada, solo un chip si tiene algo que decir.
@@ -325,7 +355,7 @@ export function PokemonEnEscena({
     const t = setTimeout(() => setEntrando(false), ENTRADA_MS);
     return () => clearTimeout(t);
   }, [entrando]);
-  const capturaArrastre = !guardando && arrastrando;
+  const capturaArrastre = !guardando && (arrastrando || ajustando);
   useEffect(() => onArrastre(id, capturaArrastre), [id, capturaArrastre, onArrastre]);
   // Al irse de la escena deja de contar, aunque se fuera con el cursor encima.
   useEffect(
@@ -367,13 +397,16 @@ export function PokemonEnEscena({
     pasada !== null ||
     combate !== null ||
     // La persona le pidió quedarse donde está: no pasea, pero se puede arrastrar a otro sitio.
-    vista.quieto === true;
+    vista.quieto === true ||
+    // Posado lejos del suelo, o asomado junto a su pokébola: reposa ahí.
+    alto > 0 ||
+    asomado;
   const noche = useNoche();
   const {
     x,
     setX,
     direccion: direccionPaseo,
-  } = usePaseo(quieto ? 0 : POSES[estado].paso * (noche ? PASO_DE_NOCHE : 1), xInicial);
+  } = usePaseo(poseDe(estado, quieto).paso * (noche ? PASO_DE_NOCHE : 1), xInicial);
   useEffect(() => onPosicion(id, x), [id, x, onPosicion]);
   const actividad = estado === "trabajando" ? (vista.actividad ?? null) : null;
   // En combate no hay escritorio: el objeto y los golpes de la actividad ceden a los del combate.
@@ -427,7 +460,15 @@ export function PokemonEnEscena({
     arrastre.current = null;
     setArrastrando(false);
     setAlzado(false);
-    if (a?.movido && estado !== "trabajando" && estado !== "guardandose") lanzarPasada(ATERRIZAJE);
+    if (a?.movido) {
+      // Cerca del suelo vuelve a pasear; más arriba queda posado. Main lo recuerda para la próxima vez.
+      const final = soltar(alto);
+      setAlto(final);
+      window.poke.lugar(id, Math.round(x), Math.round(final));
+      // Si asomaba de la incubadora y lo arrastraron fuera, sale de ella.
+      if (asomado) window.poke.sacar(id);
+      if (final === 0 && estado !== "trabajando" && estado !== "guardandose") lanzarPasada(ATERRIZAJE);
+    }
     if (!a || a.movido || !esClic) return;
     // Un clic sin arrastre: calla a la escena y pide a main su burbuja (la abre o la suelta).
     window.poke.clic();
@@ -437,7 +478,13 @@ export function PokemonEnEscena({
     // En macOS ctrl+clic abre el menú contextual: nunca llega el pointerup.
     if (e.button !== 0 || e.ctrlKey) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    arrastre.current = { inicio: e.clientX, desfase: x - e.clientX, movido: false };
+    arrastre.current = {
+      inicio: e.clientX,
+      inicioY: e.clientY,
+      desfase: x - e.clientX,
+      altoInicio: alto,
+      movido: false,
+    };
     setArrastrando(true);
   };
   const alMover = (e: PointerEvent<HTMLDivElement>) => {
@@ -447,16 +494,76 @@ export function PokemonEnEscena({
       terminarArrastre(false);
       return;
     }
-    if (!a.movido && Math.abs(e.clientX - a.inicio) > 4) {
+    if (!a.movido && Math.hypot(e.clientX - a.inicio, e.clientY - a.inicioY) > 4) {
       a.movido = true;
       setAlzado(true);
     }
-    if (a.movido) setX(Math.max(MARGEN, Math.min(window.innerWidth - MARGEN, e.clientX + a.desfase)));
+    if (a.movido) {
+      // Se mueve en los dos ejes: a lo ancho y hacia arriba (subir el cursor lo sube sobre el suelo).
+      const l = limitarLugar(
+        e.clientX + a.desfase,
+        a.altoInicio + (a.inicioY - e.clientY),
+        window.innerWidth,
+        window.innerHeight,
+      );
+      setX(l.x);
+      setAlto(l.alto);
+    }
+  };
+
+  // El agarre de la burbuja: se arrastra (o se usan las flechas) para cambiarle el tamaño; al soltar, main lo recuerda.
+  const tamano = tamLocal ?? vista.tamBurbuja ?? TAMANO_INICIAL;
+  const ajustado = tamLocal !== null || vista.tamBurbuja !== undefined;
+  // Cuando main confirma el tamaño nuevo, manda el suyo (salvo que se esté ajustando ahora mismo).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambia el que viene de main
+  useEffect(() => {
+    if (!ajuste.current) setTamLocal(null);
+  }, [vista.tamBurbuja?.ancho, vista.tamBurbuja?.alto]);
+  const ladoGlobo = ladoBurbuja(window.innerHeight - alto - ALTO_RESERVADO, alto, MIN_BURBUJA);
+  const ajustarA = (t: Tamano) =>
+    setTamLocal(limitarTamano(t.ancho, t.alto, window.innerWidth, window.innerHeight));
+  const agarreBajar = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    ajuste.current = { x: e.clientX, y: e.clientY, inicio: tamano };
+    setAjustando(true);
+  };
+  const agarreMover = (e: PointerEvent<HTMLDivElement>) => {
+    const a = ajuste.current;
+    if (!a) return;
+    ajustarA(tamanoTrasArrastre(a.inicio, e.clientX - a.x, e.clientY - a.y, ladoGlobo));
+  };
+  const agarreSoltar = () => {
+    if (!ajuste.current) return;
+    ajuste.current = null;
+    setAjustando(false);
+    if (tamLocal) window.poke.tamBurbuja(tamLocal.ancho, tamLocal.alto);
+  };
+  const agarreTecla = (e: KeyboardEvent<HTMLDivElement>) => {
+    const d: Record<string, [number, number]> = {
+      ArrowLeft: [-PASO_TECLADO, 0],
+      ArrowRight: [PASO_TECLADO, 0],
+      ArrowUp: [0, PASO_TECLADO],
+      ArrowDown: [0, -PASO_TECLADO],
+    };
+    const paso = d[e.key];
+    if (!paso) return;
+    e.preventDefault();
+    const t = limitarTamano(
+      tamano.ancho + paso[0],
+      tamano.alto + paso[1],
+      window.innerWidth,
+      window.innerHeight,
+    );
+    setTamLocal(t);
+    window.poke.tamBurbuja(t.ancho, t.alto);
   };
 
   const saliendo = entrando && !guardando;
-  const izquierda = posicionBurbuja(x, ANCHO_BURBUJA, window.innerWidth, MARGEN_BURBUJA);
-  const cola = Math.max(RADIO_COLA, Math.min(ANCHO_BURBUJA - RADIO_COLA, x - izquierda));
+  const anchoBurbuja = Math.min(tamano.ancho, window.innerWidth - 16);
+  const izquierda = posicionBurbuja(x, anchoBurbuja, window.innerWidth, MARGEN_BURBUJA);
+  const cola = Math.max(RADIO_COLA, Math.min(anchoBurbuja - RADIO_COLA, x - izquierda));
   return (
     // Grupo con el nombre: con varios en pantalla, el lector de pantalla sabe de quién es cada cosa. También es la zona
     // de paso del mouse sobre una ventana que ignora clics.
@@ -467,18 +574,38 @@ export function PokemonEnEscena({
       aria-label={vista.nombre}
       ref={raiz}
       data-captura={guardando ? undefined : ""}
-      style={{ transform: `translate3d(${x}px, 0, 0)` }}
+      style={{ transform: `translate3d(${x}px, ${-alto}px, 0)` }}
     >
       {mostrar && (
         <div
-          className="burbuja-lugar"
+          className={`burbuja-lugar ${ladoGlobo === "abajo" ? "burbuja-lugar-abajo" : ""}`}
+          data-tam={ajustado ? "" : undefined}
           style={{
-            transform: `translateX(${izquierda - (x - ANCHO_BURBUJA / 2)}px)`,
+            transform: `translateX(${izquierda - (x - anchoBurbuja / 2)}px)`,
             ["--cola" as string]: `${cola}px`,
+            ["--ancho-burbuja" as string]: `${anchoBurbuja}px`,
+            ...(ajustado ? { ["--alto-burbuja" as string]: `${tamano.alto}px` } : {}),
           }}
         >
-          <Burbuja vista={vista} />
+          <Burbuja vista={vista} lado={ladoGlobo} />
           <span className="burbuja-cola" aria-hidden="true" />
+          {/* biome-ignore lint/a11y/useSemanticElements: agarre para cambiar el tamaño, con teclado y ratón */}
+          <div
+            className={`burbuja-agarre ${ajustando ? "burbuja-agarre-activo" : ""}`}
+            role="separator"
+            tabIndex={0}
+            aria-label="Tamaño de la burbuja: flechas izquierda y derecha para el ancho, arriba y abajo para el alto"
+            aria-valuenow={anchoBurbuja}
+            aria-valuemin={ANCHO_MIN}
+            aria-valuemax={ANCHO_MAX}
+            aria-valuetext={`${anchoBurbuja} de ancho por ${tamano.alto} de alto`}
+            onPointerDown={agarreBajar}
+            onPointerMove={agarreMover}
+            onPointerUp={agarreSoltar}
+            onPointerCancel={agarreSoltar}
+            onLostPointerCapture={agarreSoltar}
+            onKeyDown={agarreTecla}
+          />
         </div>
       )}
       {chip && <BurbujaChip vista={vista} onElegir={() => onElegir(id)} />}
@@ -580,6 +707,7 @@ export function PokemonEnEscena({
               forzada={encima && !arrastrando ? reaccion : travesura}
               shiny={vista.shiny === true}
               plantado={combate !== null}
+              quieto={quieto}
               unaVez={
                 finCombate !== null
                   ? { anim: finCombate, frente: true }

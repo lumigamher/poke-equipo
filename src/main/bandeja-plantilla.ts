@@ -20,6 +20,13 @@ export interface OpcionesBandeja {
   /** Con qué modelo corre ahora (null si no se sabe). */
   modeloDe(id: string): string | null;
   alCambiarModelo(id: string, modelo: string): void;
+  /** Si se esconden solos en la incubadora al empezar a trabajar. */
+  esconderAlTrabajar(): boolean;
+  alEsconderAlTrabajar(si: boolean): void;
+  /** Si hay alguien en la incubadora. */
+  hayEscondidos(): boolean;
+  alEsconderTodos(): void;
+  alSacarTodos(): void;
 }
 
 /**
@@ -85,6 +92,18 @@ export function plantillaBandeja(o: OpcionesBandeja): MenuItemConstructorOptions
           submenuModelo(o.modeloDe(e.id), (modelo) => o.alCambiarModelo(e.id, modelo)),
         ],
       });
+    // La incubadora: esconderlos a todos (siguen trabajando) y que asomen solo cuando necesiten algo.
+    t.push(
+      { type: "separator" },
+      { label: "Esconder a todos en la incubadora", click: () => o.alEsconderTodos() },
+      { label: "Sacar a todos de la incubadora", enabled: o.hayEscondidos(), click: () => o.alSacarTodos() },
+      {
+        label: "Esconderse solos al trabajar",
+        type: "checkbox",
+        checked: o.esconderAlTrabajar(),
+        click: (item) => o.alEsconderAlTrabajar(item.checked),
+      },
+    );
   }
   if (guardados.length > 0) {
     t.push({ type: "separator" });

@@ -22,6 +22,7 @@ import {
 import { type DepsDialogo, elegirCarpeta } from "./dialogo-carpeta";
 import { palabrasDeMando, palabrasReservadas } from "./entrenador/entrenador";
 import { type DatosNuevos, Equipo } from "./equipo/equipo";
+import { actualizarEscondidos, marcasIncubadora } from "./incubadora";
 import { validarBloqueAudio } from "./oido/bloque-audio";
 import { normalizar as normalizarNombre } from "./oido/nombres";
 import { crearClientePreciso } from "./oido/preciso";
@@ -43,7 +44,19 @@ import { CATALOGO } from "./pokemon/especies";
 import { validarRespuestaPermiso } from "./pokemon/guardia-permiso";
 import { movimientosDe, nombresDeMovimientos, validarConfigTipos } from "./pokemon/tipos";
 import { elegirVoz, validarConfigVoces } from "./pokemon/voces";
-import { alternarQuieto, guardarPreferencias, leerPreferencias, type Preferencias } from "./preferencias";
+import {
+  alternarEscondido,
+  alternarQuieto,
+  esconderTodos,
+  guardarPreferencias,
+  leerPreferencias,
+  lugarDesdeMensaje,
+  type Preferencias,
+  ponerLugar,
+  sacarDeIncubadora,
+  sacarTodos,
+  tamanoDesdeMensaje,
+} from "./preferencias";
 import { prepararPrimerArranque, traerPreparacionAlFrente } from "./preparacion-ventana";
 import { primeraVez, type RespuestaLab, validarPedidoEspecie, validarRespuestaLab } from "./primera-vez";
 import { atenderRecursos, carpetaEspecie, especieEnDisco, leerAnims, registrarEsquema } from "./recursos";
@@ -542,6 +555,9 @@ async function arrancar(): Promise<void> {
   });
 
   /** Los vivos en pantalla, y el resto de la base para sacar (también con 0 en pantalla). */
+  // Antes de la bandeja: al armarse ya pregunta por la incubadora.
+  const rutaPreferencias = join(dirname(RUTAS.base()), "preferencias.json");
+  let preferencias = leerPreferencias(rutaPreferencias);
   const entradas = () => {
     const a = equipoActivo;
     if (!a) return entradasBandeja(equipo.todos(), [], () => false);
@@ -600,7 +616,18 @@ async function arrancar(): Promise<void> {
     alCambiarNombre: (id) => cambiarNombre(id),
     modeloDe: (id) => equipoActivo?.modeloDe(id) ?? null,
     alCambiarModelo: (id, modelo) => void equipoActivo?.cambiarModelo(id, modelo),
+    esconderAlTrabajar: () => preferencias.esconderAlTrabajar,
+    alEsconderAlTrabajar: (si) => cambiarPreferencias({ ...preferencias, esconderAlTrabajar: si }),
+    hayEscondidos: () => Object.keys(preferencias.escondidos).length > 0,
+    alEsconderTodos: () => cambiarPreferencias(esconderTodos(preferencias, idsEnPantalla())),
+    alSacarTodos: () => cambiarPreferencias(sacarTodos(preferencias)),
   });
+  /** Los que están vivos en pantalla (los que se pueden esconder en la incubadora). */
+  function idsEnPantalla(): string[] {
+    return entradas()
+      .filter((e) => e.activo)
+      .map((e) => e.id);
+  }
 
   /** «Cambiar nombre…» (clic derecho y barra de menú): deja la burbuja abierta con «/nombre » escrito y enfocado. */
   function cambiarNombre(id: string): void {
@@ -651,15 +678,18 @@ async function arrancar(): Promise<void> {
   const enviar = (canal: string, dato: unknown) => {
     if (!win.isDestroyed()) win.webContents.send(canal, dato);
   };
-  const rutaPreferencias = join(dirname(RUTAS.base()), "preferencias.json");
-  let preferencias = leerPreferencias(rutaPreferencias);
-  const cambiarPreferencias = (nuevas: Preferencias) => {
+  /** Guarda en disco y rehace la bandeja (muestra la incubadora), sin volver a publicar las vistas. */
+  const guardarSinPublicar = (nuevas: Preferencias) => {
     preferencias = nuevas;
     try {
       guardarPreferencias(rutaPreferencias, nuevas);
     } catch (e) {
       console.warn("No se pudieron guardar las preferencias:", e);
     }
+    bandeja.actualizar();
+  };
+  const cambiarPreferencias = (nuevas: Preferencias) => {
+    guardarSinPublicar(nuevas);
     equipoActivo?.publicar();
   };
 
@@ -690,12 +720,23 @@ async function arrancar(): Promise<void> {
       // Las vistas llegan con `abierta` marcado por EquipoActivo (la autoridad): la guardia de voz se queda solo con
       // la abierta y el Escenario recibe la lista completa y dibuja la abierta o un chip según esa marca.
       alVista(vistas);
-      // Lo que la persona ajustó desde el menú viaja con cada vista: quién se queda quieto y el tamaño del texto.
+      // La incubadora: con el modo automático, el que empieza a trabajar se esconde solo y sale al terminar.
+      const escondidos = actualizarEscondidos(
+        preferencias.escondidos,
+        vistas,
+        preferencias.esconderAlTrabajar,
+      );
+      if (escondidos !== preferencias.escondidos) guardarSinPublicar({ ...preferencias, escondidos });
+      // Lo que la persona ajustó desde el menú viaja con cada vista: quién se queda quieto, dónde lo dejó, si está en
+      // la incubadora (y si asoma), el tamaño de la burbuja y el del texto.
       enviar(
         CANALES.vista,
         vistas.map((v) => ({
           ...v,
           ...(preferencias.quietos.includes(v.id) ? { quieto: true } : {}),
+          ...(preferencias.lugares[v.id] ? { lugar: preferencias.lugares[v.id] } : {}),
+          ...marcasIncubadora(v, preferencias.escondidos),
+          ...(preferencias.burbuja ? { tamBurbuja: preferencias.burbuja } : {}),
           ...(preferencias.textoGrande ? { textoGrande: true } : {}),
           ...(preferencias.recorridoHecho ? {} : { recorrido: true }),
         })),
@@ -826,6 +867,23 @@ async function arrancar(): Promise<void> {
     activo.responderPermisoConClic(resp.permitir, resp.pokemonId, resp.permisoId);
   });
   // La persona eligió una burbuja (su chip o un clic sobre el Pokémon): main la fija y republica. Nunca responde nada.
+  // Dónde la persona soltó a un Pokémon: se recuerda para la próxima vez que salga.
+  ipcMain.on(CANALES.lugar, (_e, dato: unknown) => {
+    const l = lugarDesdeMensaje(dato);
+    if (l) cambiarPreferencias(ponerLugar(preferencias, l.id, l.lugar));
+  });
+  // Clic en su pokébola de la incubadora (o lo arrastraron fuera mientras asomaba): sale.
+  ipcMain.on(CANALES.sacar, (_e, dato: unknown) => {
+    const id = pokemonIdDe(dato);
+    if (id === null) return;
+    const nuevas = sacarDeIncubadora(preferencias, id);
+    if (nuevas !== preferencias) cambiarPreferencias(nuevas);
+  });
+  // El tamaño que la persona le dio a la burbuja: el mismo para todos.
+  ipcMain.on(CANALES.tamBurbuja, (_e, dato: unknown) => {
+    const t = tamanoDesdeMensaje(dato);
+    if (t) cambiarPreferencias({ ...preferencias, burbuja: t });
+  });
   ipcMain.on(CANALES.elegir, (_e, dato: unknown) => {
     const id = pokemonIdDe(dato);
     if (id !== null) activo.elegir(id);
@@ -878,6 +936,15 @@ async function arrancar(): Promise<void> {
       { label: "Detener lo que hace", click: () => activo.detener(id) },
       { label: "Guardar en la pokébola", click: () => activo.guardar(id) },
       {
+        // Sigue trabajando escondido: se ve como una pokébola mini sobre el Dock y asoma cuando te necesita.
+        label: preferencias.escondidos[id] ? "Sacar de la incubadora" : "Esconder en la incubadora",
+        click: () => cambiarPreferencias(alternarEscondido(preferencias, id)),
+      },
+      {
+        label: "Esconder a todos en la incubadora",
+        click: () => cambiarPreferencias(esconderTodos(preferencias, idsEnPantalla())),
+      },
+      {
         label: "Cambiar de proyecto…",
         click: () =>
           void cambiarProyecto(id).catch((e) => console.warn("No se pudo cambiar de proyecto:", e)),
@@ -895,6 +962,13 @@ async function arrancar(): Promise<void> {
         type: "checkbox",
         checked: preferencias.textoGrande,
         click: (item) => cambiarPreferencias({ ...preferencias, textoGrande: item.checked }),
+      },
+      {
+        // Global: todos se esconden solos al empezar a trabajar y salen al terminar.
+        label: "Esconderse solos al trabajar",
+        type: "checkbox",
+        checked: preferencias.esconderAlTrabajar,
+        click: (item) => cambiarPreferencias({ ...preferencias, esconderAlTrabajar: item.checked }),
       },
       { type: "separator" },
       {

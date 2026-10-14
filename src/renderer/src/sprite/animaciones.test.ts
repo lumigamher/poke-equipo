@@ -11,6 +11,7 @@ import {
   margenInferior,
   margenSuperior,
   POSES,
+  poseDe,
   ticEn,
 } from "./animaciones";
 
@@ -77,6 +78,29 @@ describe("POSES y elegirAnim", () => {
     expect(elegirAnim(POSES.dormido, { Walk: walk })).toBe("Walk");
     expect(elegirAnim(POSES.dormido, { Hop: walk })).toBe("Hop");
     expect(elegirAnim(POSES.dormido, {})).toBeNull();
+  });
+});
+
+describe("poseDe", () => {
+  it("si no se desplaza, en vez de caminar en el sitio usa la pose de reposo", () => {
+    for (const estado of ["paseando", "cansado"] as const) {
+      const pose = poseDe(estado, true);
+      expect(pose.anim).toBe("Idle");
+      expect(pose.paso).toBe(0);
+      expect(pose.bucle).toBe(true);
+      expect(pose.frente).toBe(true);
+    }
+  });
+
+  it("si se desplaza, conserva la pose de su estado", () => {
+    expect(poseDe("paseando", false)).toEqual(POSES.paseando);
+    expect(poseDe("cansado", false)).toEqual(POSES.cansado);
+  });
+
+  it("las poses que no caminan no cambian por estar quieto", () => {
+    for (const estado of ESTADOS.filter((e) => POSES[e].paso === 0)) {
+      expect(poseDe(estado, true)).toEqual(POSES[estado]);
+    }
   });
 });
 

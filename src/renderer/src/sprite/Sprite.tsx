@@ -9,6 +9,7 @@ import {
   margenInferior,
   margenSuperior,
   POSES,
+  poseDe,
   ticEn,
 } from "./animaciones";
 
@@ -163,6 +164,8 @@ interface Props {
   shiny?: boolean;
   /** Plantado en su sitio mirando hacia `direccion` (en un combate), en vez de la pose de su estado. */
   plantado?: boolean;
+  /** No se desplaza: si su estado es de caminar, reposa en vez de caminar en el sitio. */
+  quieto?: boolean;
 }
 
 /** Estados en los que el Pokémon no está ocupado y puede saludar al cursor. */
@@ -179,6 +182,7 @@ export function Sprite({
   colgado = null,
   shiny = false,
   plantado = false,
+  quieto = false,
 }: Props) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   const ultima = useRef<Visible | null>(null);
@@ -194,7 +198,7 @@ export function Sprite({
         ? { anim: "Idle", bucle: true, frente: false, paso: 0 }
         : forzada && LIBRE.includes(estado)
           ? { anim: forzada, bucle: true, frente: true, paso: 0 }
-          : POSES[estado];
+          : poseDe(estado, quieto);
   // Con actividad la animación sale de su lista y siempre va en bucle; sin ella, como siempre.
   const pose = deActividad ? { ...base, bucle: true, frente: deActividad.frente } : base;
   const velocidad = deActividad?.velocidad ?? 1;

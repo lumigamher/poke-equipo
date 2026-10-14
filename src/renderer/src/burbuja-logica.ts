@@ -17,7 +17,7 @@ export function burbujaAMostrar(vista: VistaPokemon, fijada: boolean): Burbuja |
 }
 
 /** El estado en palabras, para el chip y el lector de pantalla. */
-const ESTADO_LEGIBLE: Record<Estado, string> = {
+export const ESTADO_LEGIBLE: Record<Estado, string> = {
   saliendo: "saliendo",
   paseando: "paseando",
   escuchando: "escuchando",

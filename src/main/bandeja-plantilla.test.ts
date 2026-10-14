@@ -9,7 +9,12 @@ import {
 
 type Item = ReturnType<typeof plantillaBandeja>[number];
 
-function opciones(equipo: EntradaBandeja[], microfono = true, modelo: string | null = "sonnet") {
+function opciones(
+  equipo: EntradaBandeja[],
+  microfono = true,
+  modelo: string | null = "sonnet",
+  incubadora = { auto: false, hayEscondidos: false },
+) {
   const o = {
     microfono: () => microfono,
     alMicrofono: vi.fn(),
@@ -20,6 +25,11 @@ function opciones(equipo: EntradaBandeja[], microfono = true, modelo: string | n
     alCambiarNombre: vi.fn(),
     modeloDe: vi.fn(() => modelo),
     alCambiarModelo: vi.fn(),
+    esconderAlTrabajar: () => incubadora.auto,
+    alEsconderAlTrabajar: vi.fn(),
+    hayEscondidos: () => incubadora.hayEscondidos,
+    alEsconderTodos: vi.fn(),
+    alSacarTodos: vi.fn(),
   } satisfies OpcionesBandeja;
   return o;
 }
@@ -122,6 +132,43 @@ describe("plantillaBandeja", () => {
     expect(mic?.checked).toBe(false);
     clic(mic, true);
     expect(o.alMicrofono).toHaveBeenCalledWith(true);
+  });
+
+  it("con alguien en pantalla ofrece la incubadora: esconder a todos, sacar a todos y esconderse solos", () => {
+    const o = opciones([{ id: "p", nombre: "Pikachu", activo: true }], true, "sonnet", {
+      auto: false,
+      hayEscondidos: true,
+    });
+    const t = plantillaBandeja(o);
+    const labels = t.map((i) => i.label).filter(Boolean);
+    const desde = labels.indexOf("Esconder a todos en la incubadora");
+    expect(labels.slice(desde, desde + 3)).toEqual([
+      "Esconder a todos en la incubadora",
+      "Sacar a todos de la incubadora",
+      "Esconderse solos al trabajar",
+    ]);
+    clic(t.find((i) => i.label === "Esconder a todos en la incubadora"));
+    expect(o.alEsconderTodos).toHaveBeenCalledTimes(1);
+    clic(t.find((i) => i.label === "Sacar a todos de la incubadora"));
+    expect(o.alSacarTodos).toHaveBeenCalledTimes(1);
+  });
+
+  it("«Sacar a todos» solo se habilita si hay alguien en la incubadora", () => {
+    const sin = plantillaBandeja(opciones([{ id: "p", nombre: "Pikachu", activo: true }]));
+    expect(sin.find((i) => i.label === "Sacar a todos de la incubadora")?.enabled).toBe(false);
+  });
+
+  it("«Esconderse solos al trabajar» es un checkbox con el estado actual y avisa el nuevo", () => {
+    const o = opciones([{ id: "p", nombre: "Pikachu", activo: true }], true, "sonnet", {
+      auto: true,
+      hayEscondidos: false,
+    });
+    const t = plantillaBandeja(o);
+    const auto = t.find((i) => i.label === "Esconderse solos al trabajar");
+    expect(auto?.type).toBe("checkbox");
+    expect(auto?.checked).toBe(true);
+    clic(auto, false);
+    expect(o.alEsconderAlTrabajar).toHaveBeenCalledWith(false);
   });
 
   it("salir usa el rol quit; ninguna opción toca permisos", () => {

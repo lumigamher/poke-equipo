@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { altoDisponible, estaAlFondo, guardarScroll, quePasaAlLlegar, tomarScroll } from "./registro-scroll";
+import {
+  altoDisponible,
+  altoDisponibleAbajo,
+  estaAlFondo,
+  guardarScroll,
+  quePasaAlLlegar,
+  tomarScroll,
+} from "./registro-scroll";
 
 describe("estaAlFondo", () => {
   it("pegado al fondo exacto", () => {
@@ -44,5 +51,15 @@ describe("altoDisponible", () => {
   });
   it("nunca baja de un mínimo usable", () => {
     expect(altoDisponible(50)).toBe(160);
+  });
+});
+
+describe("altoDisponibleAbajo", () => {
+  it("abierta hacia abajo: lo que queda bajo su borde superior, sin salirse por abajo", () => {
+    expect(altoDisponibleAbajo(200, 900)).toBe(900 - 200 - 12);
+  });
+
+  it("nunca menos del mínimo de siempre", () => {
+    expect(altoDisponibleAbajo(880, 900)).toBe(160);
   });
 });

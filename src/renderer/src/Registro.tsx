@@ -2,6 +2,7 @@ import type { EntradaVivo, VistaRegistro } from "@compartido/registro-vivo";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Markdown } from "./BurbujaPartes";
 import { estaAlFondo, guardarScroll, quePasaAlLlegar, tomarScroll } from "./registro-scroll";
+import { comandoDeAccion } from "./registro-terminal";
 
 /** Un área con scroll debe poder tomar el foco para leerla con teclado (WCAG 2.1.1). */
 const FOCO_TECLADO = { tabIndex: 0 };
@@ -18,6 +19,18 @@ const Entrada = memo(
         </p>
       );
     if (e.tipo === "ayudante") return <p className="registro-ayudante">{e.texto}</p>;
+    // Un comando de terminal se ve como terminal: fondo oscuro, monoespaciado y con su $.
+    const comando = comandoDeAccion(e.texto);
+    if (comando !== null)
+      return (
+        <p className="registro-terminal">
+          <span className="solo-lector">Acción: correr en la terminal: </span>
+          <span className="registro-prompt" aria-hidden="true">
+            ${" "}
+          </span>
+          <code>{comando}</code>
+        </p>
+      );
     return (
       <p className="registro-accion">
         <span className="registro-marca" aria-hidden="true" />

@@ -329,7 +329,7 @@ body {
 /* Caja de diálogo al estilo de los juegos: papel claro, borde grueso, sombra dura. */
 .burbuja {
   box-sizing: border-box;
-  width: 320px;
+  width: var(--ancho-burbuja, 320px);
   max-height: min(300px, var(--alto-disp, 300px));
   overflow-y: auto;
   padding: 10px 12px;
@@ -342,7 +342,7 @@ body {
 }
 .burbuja-lugar {
   position: relative;
-  width: 320px;
+  width: var(--ancho-burbuja, 320px);
 }
 /* Cola que apunta al Pokémon: --cola es su x dentro de la burbuja, ya limitada a las esquinas. */
 .burbuja-cola {
@@ -2275,4 +2275,210 @@ body.preparacion #raiz {
   .prep-barra-relleno {
     transition: none;
   }
+}
+
+/* Comandos de terminal en el registro: se ven como terminal. */
+.registro-terminal {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--tinta);
+  color: var(--papel);
+  font:
+    11.5px / 1.45 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.registro-prompt {
+  color: #78c850;
+  font-weight: 700;
+  user-select: none;
+}
+.registro .registro-terminal code {
+  font: inherit;
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+.texto-grande .registro-terminal {
+  font-size: 13.5px;
+}
+
+/* La incubadora: pokébolas mini en la esquina de abajo a la derecha, sobre el Dock. */
+.incubadora {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  pointer-events: none;
+}
+.incubadora-bola {
+  position: absolute;
+  bottom: 6px;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+}
+.incubadora-bola .pokebola-fija {
+  transform: scale(0.72);
+  transform-origin: 50% 100%;
+}
+.incubadora-bola:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+/* Trabaja: la bola se mece. Te necesita: salta con un halo (y el Pokémon asoma a su lado). */
+.incubadora-bola-trabaja .pokebola-fija {
+  animation: incubadora-mecer 1.6s ease-in-out infinite;
+}
+.incubadora-bola-asoma .pokebola-fija {
+  animation: incubadora-saltar 0.9s var(--ease-out) infinite;
+}
+.incubadora-bola-asoma::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px #f6c945,
+    0 0 10px 2px rgba(246, 201, 69, 0.7);
+  pointer-events: none;
+}
+.incubadora-nombre {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(38, 34, 28, 0.88);
+  color: var(--papel);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity 120ms var(--ease-out),
+    transform 120ms var(--ease-out);
+  pointer-events: none;
+}
+.incubadora-bola:hover .incubadora-nombre,
+.incubadora-bola:focus-visible .incubadora-nombre {
+  opacity: 1;
+  transform: none;
+}
+@keyframes incubadora-mecer {
+  0%,
+  100% {
+    transform: scale(0.72) rotate(0);
+  }
+  25% {
+    transform: scale(0.72) rotate(-8deg);
+  }
+  75% {
+    transform: scale(0.72) rotate(8deg);
+  }
+}
+@keyframes incubadora-saltar {
+  0%,
+  100% {
+    transform: scale(0.72) translateY(0);
+  }
+  40% {
+    transform: scale(0.72) translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .incubadora-bola .pokebola-fija {
+    animation: none;
+  }
+  .incubadora-nombre {
+    transition: none;
+  }
+}
+
+/* La burbuja que la persona ajusta y la que abre hacia abajo: al final, porque afinan reglas de arriba. */
+/* Posado arriba sin espacio encima: abre hacia abajo, bajo sus pies, con la cola apuntando hacia arriba. */
+.burbuja-lugar-abajo {
+  position: absolute;
+  top: 100%;
+  left: calc(var(--ancho-burbuja, 320px) / -2);
+  margin-top: 12px;
+  z-index: 2;
+}
+.burbuja-lugar-abajo .burbuja {
+  transform-origin: 50% 0;
+}
+.burbuja-lugar-abajo .burbuja-cola {
+  bottom: auto;
+  top: -7px;
+  transform: rotate(225deg);
+}
+/* Agarre para cambiar el tamaño: en la esquina de arriba a la derecha (abajo si abre hacia abajo). */
+/* La zona que se puede tocar mide 24 px (WCAG 2.5.8); el dibujo, 14 px en el centro. */
+.burbuja-agarre {
+  position: absolute;
+  right: -12px;
+  top: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-size: 14px 14px;
+  background-position: center;
+  background-repeat: no-repeat;
+  cursor: nesw-resize;
+  touch-action: none;
+  background-image: linear-gradient(
+    to top right,
+    transparent 0 48%,
+    var(--borde) 48% 58%,
+    transparent 58% 70%,
+    var(--borde) 70% 80%,
+    transparent 80%
+  );
+  opacity: 0.5;
+  transition: opacity 120ms var(--ease-out);
+}
+.burbuja-agarre:hover,
+.burbuja-agarre:focus-visible,
+.burbuja-agarre-activo {
+  opacity: 1;
+}
+.burbuja-agarre:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: 1px;
+}
+.burbuja-lugar-abajo .burbuja-agarre {
+  top: auto;
+  bottom: -12px;
+  cursor: nwse-resize;
+  background-image: linear-gradient(
+    to bottom right,
+    transparent 0 48%,
+    var(--borde) 48% 58%,
+    transparent 58% 70%,
+    var(--borde) 70% 80%,
+    transparent 80%
+  );
+}
+/* Con el tamaño que le dio la persona: la viva toma ese alto (el registro llena lo que sobra); las demás, como tope. */
+.burbuja-lugar[data-tam] .burbuja {
+  max-height: min(var(--alto-burbuja), var(--alto-disp, 9999px));
+}
+.burbuja-lugar[data-tam] .burbuja-viva {
+  height: min(var(--alto-burbuja), var(--alto-disp, 9999px));
+  max-height: none;
 }

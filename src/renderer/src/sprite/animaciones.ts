@@ -26,6 +26,18 @@ export const POSES: Record<Estado, Pose> = {
   guardandose: { anim: "Hop", bucle: false, frente: true, paso: 0 },
 };
 
+/** Lo que hace en su sitio cuando su estado es de caminar pero no se desplaza: lo mismo que al esperar. */
+const REPOSO: Pose = POSES.esperando;
+
+/**
+ * La pose de su estado, salvo que sea de caminar y no se esté desplazando (la persona lo dejó quieto, o algo lo tiene
+ * parado): entonces reposa.
+ */
+export function poseDe(estado: Estado, quieto: boolean): Pose {
+  const pose = POSES[estado];
+  return quieto && pose.paso > 0 ? REPOSO : pose;
+}
+
 /** Qué usar cuando la especie no trae la animación pedida (Psyduck y Snorlax traen pocas), antes de caer en Idle. */
 const ALTERNAS: Record<string, string[]> = {
   Pain: ["Hurt"],

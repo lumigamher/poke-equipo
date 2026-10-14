@@ -22,7 +22,7 @@ import {
 import { Progreso } from "./Progreso";
 import { suscribirPrellenado, usarPrellenado } from "./prellenado";
 import { RegistroEnVivo, RegistroTerminado } from "./Registro";
-import { altoDisponible } from "./registro-scroll";
+import { altoDisponible, altoDisponibleAbajo } from "./registro-scroll";
 
 /**
  * El campo de texto es dueño del foco: al desmontarse, devuelve el foco a la app de abajo. Al escribir "/" muestra
@@ -229,25 +229,29 @@ function BloquePermiso({
  * La burbuja ABIERTA (solo se dibuja la que main marca como abierta). Como la persona puede haberla elegido sin nada nuevo,
  * sin burbuja viva muestra su última respuesta.
  */
-export function Burbuja({ vista }: { vista: VistaPokemon }) {
+export function Burbuja({ vista, lado = "arriba" }: { vista: VistaPokemon; lado?: "arriba" | "abajo" }) {
   const { permiso } = vista;
   const burbuja = burbujaAMostrar(vista, true);
   const registro = vista.registro && vista.registro.entradas.length > 0 ? vista.registro : null;
   const trabajando = vista.estado === "trabajando";
   const [panel, setPanel] = useState<Panel>(null);
-  // La burbuja se ancla abajo (sobre el Pokémon): su tope de alto es lo que queda por encima de su borde inferior.
+  // Abierta hacia arriba se ancla abajo (sobre el Pokémon): su tope de alto es lo que queda por encima de su borde
+  // inferior. Hacia abajo (Pokémon posado arriba), lo que queda por debajo de su borde superior.
   const caja = useRef<HTMLDivElement>(null);
   const [disponible, setDisponible] = useState<number | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: hay que volver a medir cuando vuelve la burbuja tras un permiso
   useLayoutEffect(() => {
     const medir = () => {
       const r = caja.current?.getBoundingClientRect();
-      if (r) setDisponible(altoDisponible(r.bottom));
+      if (r)
+        setDisponible(
+          lado === "abajo" ? altoDisponibleAbajo(r.top, window.innerHeight) : altoDisponible(r.bottom),
+        );
     };
     medir();
     window.addEventListener("resize", medir);
     return () => window.removeEventListener("resize", medir);
-  }, [permiso?.id]);
+  }, [permiso?.id, lado]);
 
   // El permiso pendiente manda: se dibuja siempre que exista, con o sin burbuja.
   if (permiso)
