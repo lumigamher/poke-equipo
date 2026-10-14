@@ -6,12 +6,17 @@ Es un proyecto personal de fans, sin ánimo de lucro. Mira [AVISOS.md](AVISOS.md
 
 ## Capturas
 
-<!-- Pon aquí las imágenes en docs/img/ -->
+![El equipo paseando por el escritorio](https://res.cloudinary.com/duzuudlte/image/upload/v1791947502/poke-equipo/equipo.png)
 
-| | |
+| Laboratorio de primera vez | Pokédex oculta de Kanto |
 | --- | --- |
-| ![Laboratorio de primera vez](docs/img/laboratorio.png) | ![Un Pokémon con su burbuja](docs/img/burbuja.png) |
-| ![El equipo en el escritorio](docs/img/equipo.png) | ![Permiso pendiente](docs/img/permiso.png) |
+| ![Laboratorio: eliges tu primer Pokémon](https://res.cloudinary.com/duzuudlte/image/upload/v1791947499/poke-equipo/laboratorio.png) | ![Pokédex con los 151 de Kanto](https://res.cloudinary.com/duzuudlte/image/upload/v1791947499/poke-equipo/pokedex.png) |
+
+| Con qué modelo trabaja | La burbuja mientras trabaja |
+| --- | --- |
+| ![Selector de modelo: Haiku, Sonnet u Opus](https://res.cloudinary.com/duzuudlte/image/upload/v1791947500/poke-equipo/modelo.png) | ![Burbuja con lo que hace en vivo](https://res.cloudinary.com/duzuudlte/image/upload/v1791947501/poke-equipo/burbuja.png) |
+
+Los sprites que se ven son de [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab) (CC BY-NC 4.0).
 
 ## Qué hace
 
